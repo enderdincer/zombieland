@@ -1,4 +1,8 @@
 // Runs the Worker (rooms) and the Vite client together. Vite proxies /ws and /api to the Worker.
+import { mkdirSync } from "node:fs"
+
+// Wrangler refuses to start without its assets directory, which only a build makes; a fresh clone has none.
+mkdirSync("dist", { recursive: true })
 await Bun.spawn(["bun", "scripts/build-id.ts"], { stdio: ["inherit", "inherit", "inherit"] }).exited
 const procs = [
   Bun.spawn(["bunx", "wrangler", "dev", "--port", "8788"], { stdio: ["inherit", "inherit", "inherit"] }),

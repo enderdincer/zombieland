@@ -5,10 +5,11 @@ import { placesFor } from "./places"
 import type { Intent, Player, World } from "./world"
 import type { FlagView, TagView, ZoneView } from "./modes-objective"
 import type { RulesView } from "./modes-rules"
+import type { ZombieView } from "./modes-zombie"
 import { type Kit, gunKit } from "./kit"
 
-export type ModeId = "ffa" | "tdm" | "dom" | "snd" | "kc" | "hp" | "ctf" | "inf" | "gun" | "oitc"
-export const MODE_IDS: readonly ModeId[] = ["ffa", "tdm", "dom", "snd", "kc", "hp", "ctf", "inf", "gun", "oitc"]
+export type ModeId = "ffa" | "tdm" | "dom" | "snd" | "kc" | "hp" | "ctf" | "inf" | "gun" | "oitc" | "zsv" | "zend" | "zhold"
+export const MODE_IDS: readonly ModeId[] = ["ffa", "tdm", "dom", "snd", "kc", "hp", "ctf", "inf", "gun", "oitc", "zsv", "zend", "zhold"]
 
 export const MODES: Record<ModeId, { label: string; short: string; blurb: string; teams: boolean }> = {
   ffa: { label: "Free for all", short: "FFA", blurb: "Everyone for themselves. Most kills wins.", teams: false },
@@ -21,6 +22,9 @@ export const MODES: Record<ModeId, { label: string; short: string; blurb: string
   inf: { label: "Infected", short: "INF", blurb: "One player turns. Their swipe infects. Survive three minutes.", teams: true },
   gun: { label: "Gun game", short: "GUN", blurb: "A new gun every kill. First through the ladder wins.", teams: false },
   oitc: { label: "One in the chamber", short: "OITC", blurb: "One bullet, one kill, three lives. Kills reload you.", teams: false },
+  zsv: { label: "Zombie survival", short: "ZOMB", blurb: "Co-op against ten waves of the dead. The fallen get up when a wave is cleared.", teams: true },
+  zend: { label: "Endless night", short: "ENDL", blurb: "Co-op, waves that never stop, faster and tougher each time. How long can you last?", teams: true },
+  zhold: { label: "Hold the line", short: "HOLD", blurb: "Co-op: keep the horde out of the zone for eight waves. Its integrity is your life.", teams: true },
 }
 
 export const modeOf = (v: unknown): ModeId | null => ((MODE_IDS as readonly unknown[]).includes(v) ? (v as ModeId) : null)
@@ -59,6 +63,8 @@ export type ModeView = {
   flags?: FlagView[]
   /** Infected, gun game, one in the chamber (shared/sim/modes-rules.ts). */
   rules?: RulesView
+  /** Zombie modes: the wave, the horde and the zone (shared/sim/modes-zombie.ts). */
+  zombies?: ZombieView
 }
 
 /** A free-for-all view with nothing going on, for dev pages that fake a snapshot. */

@@ -14,8 +14,8 @@ export const canSwing = (p: Player, now: number): boolean => p.alive && p.kit.me
 
 /** Starts a swing: it lands after the wind-up. */
 export function startSwing(w: World, p: Player): void {
-  p.swingAt = w.time + MELEE.windup
-  p.meleeReadyAt = w.time + MELEE.cooldown
+  p.swingAt = w.time + (p.kit.swing?.windup ?? MELEE.windup)
+  p.meleeReadyAt = w.time + (p.kit.swing?.cooldown ?? MELEE.cooldown)
   w.events.push({ k: "swing", by: p.id })
 }
 
@@ -23,10 +23,11 @@ export function startSwing(w: World, p: Player): void {
 export function swingTarget(w: World, p: Player): Player | null {
   let best: Player | null = null
   let bd = Infinity
+  const range = p.kit.swing?.range ?? MELEE.range
   for (const q of w.players.values()) {
     if (!q.alive || q === p || w.allies(p, q)) continue
     const d = Math.hypot(q.x - p.x, q.y - p.y)
-    if (d > MELEE.range || d >= bd) continue
+    if (d > range || d >= bd) continue
     if (d > 0.05 && Math.abs(angleDiff(Math.atan2(q.y - p.y, q.x - p.x), p.aim)) > MELEE.arc) continue
     if (!clearLine(p.x, p.y, q.x, q.y, w.blockers)) continue
     best = q
@@ -35,10 +36,10 @@ export function swingTarget(w: World, p: Player): Player | null {
   return best
 }
 
-/** A pending swing lands once its wind-up is over: one hit kills. */
+/** A pending swing lands once its wind-up is over: one hit kills, unless the kit's swing says how much it hurts. */
 export function stepSwing(w: World, p: Player): void {
   if (p.swingAt === 0 || w.time < p.swingAt) return
   p.swingAt = 0
   const q = swingTarget(w, p)
-  if (q) w.damage(q, q.health + 1000, p, "melee", p.x, p.y)
+  if (q) w.damage(q, p.kit.swing?.damage ?? q.health + 1000, p, "melee", p.x, p.y)
 }

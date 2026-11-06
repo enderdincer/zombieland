@@ -3,7 +3,7 @@ import type { Kit } from "./kit"
 import type { ModeView } from "./modes"
 import type { Phase, World } from "./world"
 
-export type PlayerView = { id: string; x: number; y: number; vx: number; vy: number; aim: number; alive: boolean; gun: Gun; health: number; bare?: boolean }
+export type PlayerView = { id: string; x: number; y: number; vx: number; vy: number; aim: number; alive: boolean; gun: Gun; health: number; bare?: boolean; z?: string }
 export type GrenadeView = { id: number; by: string; x: number; y: number; z: number; vx: number; vy: number; vz: number; fuse: number }
 export type ClaymoreView = { id: number; by: string; x: number; y: number; aim: number; armed: boolean; tripped: boolean }
 export type RosterRow = { id: string; name: string; human: boolean; kills: number; deaths: number; team: number; caps: number; plants: number; defuses: number; stats?: Record<string, number>; host?: true }
@@ -43,7 +43,7 @@ export function buildSnapshot(world: World, viewerId: string): Snapshot {
     match: world.match,
     players: world.order.map((id) => {
       const p = world.players.get(id)!
-      return { id, x: p.x, y: p.y, vx: p.vx, vy: p.vy, aim: p.aim, alive: p.alive, gun: p.gun, health: p.health, ...(p.kit.gun ? {} : { bare: true }) }
+      return { id, x: p.x, y: p.y, vx: p.vx, vy: p.vy, aim: p.aim, alive: p.alive, gun: p.gun, health: p.health, ...(p.kit.gun ? {} : { bare: true }), ...(p.npc ? { z: p.npc } : {}) }
     }),
     grenades: world.grenades.map((g) => ({ id: g.id, by: g.by, x: g.x, y: g.y, z: g.z, vx: g.vx, vy: g.vy, vz: g.vz, fuse: Math.max(0, g.at - world.time) })),
     claymores: world.claymores.map((c) => ({ id: c.id, by: c.by, x: c.x, y: c.y, aim: c.aim, armed: world.time >= c.armAt, tripped: c.blowAt > 0 })),
@@ -53,7 +53,7 @@ export function buildSnapshot(world: World, viewerId: string): Snapshot {
 }
 
 export function rosterOf(world: World): RosterRow[] {
-  return world.order.map((id) => {
+  return world.order.filter((id) => !world.players.get(id)!.npc).map((id) => {
     const p = world.players.get(id)!
     return { id, name: p.name, human: p.human, kills: p.kills, deaths: p.deaths, team: p.team, caps: p.caps, plants: p.plants, defuses: p.defuses, stats: { ...p.stats }, ...(world.host === id ? { host: true as const } : {}) }
   })

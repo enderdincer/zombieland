@@ -375,3 +375,43 @@ tr.team td span {
   border-color: var(--ink);
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* Hold the line: the zone's integrity under the wave line. */
+#mtop .zbar {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+
+#mtop .zbar .track {
+  width: 200px;
+  height: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+#mtop .zbar .track i {
+  display: block;
+  height: 100%;
+  background: rgb(20, 184, 255);
+  transition: width 0.2s;
+}
+
+#mtop .zbar.hot span,
+#mtop .zbar.hot .track i {
+  color: #ff5040;
+  background: #ff5040;
+  animation: zpulse 0.5s infinite alternate;
+}
+
+#mtop .zbar.hot span {
+  background: none;
+}
+
+@keyframes zpulse {
+  to {
+    opacity: 0.45;
+  }
+}

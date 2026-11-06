@@ -5,7 +5,7 @@ import type { RosterRow, Snapshot } from "../../shared/sim/view"
 import "./teams.css"
 import { css, type Rgb3 } from "../game/game"
 import { TEAM_COLORS } from "../game/mode-fx"
-import { boardStat, rulesColumns, rulesTeam, rulesWinner } from "./rules-hud"
+import { boardStat, rulesColumns, rulesResult, rulesTeam, rulesWinner } from "./rules-hud"
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
@@ -204,7 +204,7 @@ export class Menus {
     const head = `<thead><tr><th></th>${cols.map(([c]) => `<th>${c}</th>`).join("")}${amHost ? "<th></th>" : ""}</tr></thead>`
     const body = info.teams
       ? [0, 1]
-          .map((t) => `<tr class="team"><td colspan="${span}"><b style="color:${teamColor(t)}">${teamName(t)}</b><span>${m.score[t]}${m.target ? ` / ${m.target}` : ""}</span></td></tr>${ranked.filter((r) => r.team === t).map(row).join("")}`)
+          .map((t) => `<tr class="team"><td colspan="${span}"><b style="color:${teamColor(t)}">${teamName(t)}</b><span>${m.score[t]}${m.target && !(m.zombies && t === 1) ? ` / ${m.target}` : ""}</span></td></tr>${ranked.filter((r) => r.team === t).map(row).join("")}`)
           .join("")
       : ranked.map(row).join("")
     const hostbar = !picks
@@ -215,7 +215,8 @@ export class Menus {
     let result = ""
     if (s.phase === "end") {
       const winner = rulesWinner(s, roster) ?? ranked[0]
-      const text = info.teams ? (m.winner >= 0 ? `<span style="color:${teamColor(m.winner)}">${teamName(m.winner)}</span> WIN${m.id === "inf" ? "" : "S"}` : "DRAW") : winner ? `<span style="color:${css(colorOf(winner.id))}">${esc(winner.name.toUpperCase())}</span> WINS` : ""
+      const custom = rulesResult(s)
+      const text = custom ? esc(custom) : info.teams ? (m.winner >= 0 ? `<span style="color:${teamColor(m.winner)}">${teamName(m.winner)}</span> WIN${m.id === "inf" ? "" : "S"}` : "DRAW") : winner ? `<span style="color:${css(colorOf(winner.id))}">${esc(winner.name.toUpperCase())}</span> WINS` : ""
       result = `<div class="result">${text}</div><div class="sub">Next floor in ${Math.ceil(s.left)}</div>`
     }
     const url = room ? `${location.origin}${location.pathname}?room=${room}` : ""

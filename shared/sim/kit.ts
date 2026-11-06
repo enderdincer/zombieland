@@ -30,7 +30,14 @@ export type Kit = {
   run: number
   /** Health comes back out of combat. */
   regen: boolean
+  /** Full health this life, when not the usual HEALTH (zombies). */
+  health?: number
+  /** A swing that hurts instead of killing outright, with its own timing and reach (zombies, the knife vs zombies). */
+  swing?: Swing
 }
+
+/** Melee overrides: damage per hit, seconds from press to hit and between presses, and reach in metres. */
+export type Swing = { damage: number; windup: number; cooldown: number; range: number }
 
 /** The usual loadout: the gun and equipment you picked. */
 export function gunKit(gun: Gun, equip: Equip | null = null, over: Partial<Kit> = {}): Kit {

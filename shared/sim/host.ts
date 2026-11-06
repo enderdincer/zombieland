@@ -9,7 +9,7 @@ import type { Player, World } from "./world"
  */
 
 /** Modes where the teams are the game itself, not sides to pick. */
-const FIXED_TEAMS: readonly string[] = ["inf"]
+const FIXED_TEAMS: readonly string[] = ["inf", "zsv", "zend", "zhold"]
 
 /** Whether the host can pick sides in the mode. */
 export const hostPicks = (mode: ModeId): boolean => MODES[mode].teams && !FIXED_TEAMS.includes(mode)

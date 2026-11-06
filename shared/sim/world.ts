@@ -9,6 +9,7 @@ import "./modes-objective"
 import { stepBody } from "./move"
 import { nextHost } from "./host"
 import "./modes-rules"
+import "./modes-zombie"
 import { type Kit, gunKit, kitSprints } from "./kit"
 import { canSwing, startSwing, stepSwing } from "./melee"
 
@@ -77,6 +78,11 @@ export type Player = {
   /** A melee swing lands at this time (0 for none); the next can start at meleeReadyAt. */
   swingAt: number
   meleeReadyAt: number
+  /**
+   * Set for players the mode runs itself (zombies: their kind): not a seat, not on the roster, not counted by fill(),
+   * and gone when the match ends.
+   */
+  npc: string
 }
 
 export type SimEvent =
@@ -96,6 +102,8 @@ export type SimEvent =
   | { k: "obj"; what: string; team: number; by: string; x: number; y: number }
   /** The room host restarted the match, in the same mode or a new one (shared/sim/host.ts). */
   | { k: "host"; what: "reset" | "mode"; mode: ModeId }
+  /** Zombie modes: wave `n` starts or is cleared. */
+  | { k: "wave"; what: "start" | "clear"; n: number }
 
 const BOT_NAMES = ["kade", "rei", "mako", "juno", "lexx", "ryn", "zen", "lee", "nox", "ivo", "sable", "wren"]
 
@@ -153,6 +161,7 @@ export class World {
 
   /** Switches mode and restarts the match on the same floor: the room creator's pick, before anyone else is in. */
   setMode(id: ModeId): void {
+    this.purgeNpcs()
     this.mode = createMode(id)
     this.phase = "play"
     this.phaseEnd = this.time + this.mode.seconds
@@ -218,9 +227,10 @@ export class World {
 
   /** Keeps the room at `to` players with bots, removing bots as humans join. Online rooms use 0: humans only. */
   fill(to = this.botFill): void {
-    const bots = [...this.players.values()].filter((p) => !p.human)
-    while (this.players.size > to && bots.length) this.remove(bots.pop()!.id)
-    while (this.players.size < to) {
+    const seats = () => [...this.players.values()].filter((p) => !p.npc).length
+    const bots = [...this.players.values()].filter((p) => !p.human && !p.npc)
+    while (seats() > to && bots.length) this.remove(bots.pop()!.id)
+    while (seats() < to) {
       const id = `bot${++this.botCount}`
       const p = this.newPlayer(id, BOT_NAMES[(this.botCount - 1) % BOT_NAMES.length]!, new BotBrain(this.rng.next() * 1e9))
       p.pick = this.rng.next() < 0.6 ? "rifle" : this.rng.pick(GUN_IDS)
@@ -230,8 +240,18 @@ export class World {
     }
   }
 
+  /** Adds a player the mode runs (a zombie), dead until the mode spawns it. */
+  addNpc(id: string, name: string, kind: string, brain: Brain): Player {
+    const p = this.newPlayer(id, name, brain)
+    p.npc = kind
+    p.respawnAt = Infinity
+    this.players.set(id, p)
+    this.order.push(id)
+    return p
+  }
+
   private newPlayer(id: string, name: string, brain: Brain | null): Player {
-    return { id, name, human: !brain, brain, x: 0, y: 0, vx: 0, vy: 0, aim: 0, alive: false, respawnAt: 0, cooldownUntil: 0, readyAt: 0, gun: "rifle", pick: "rifle", equip: "frag", equipLeft: 0, equipPick: "frag", triggerHeld: false, health: HEALTH, hurtAt: 0, mag: 0, reloadUntil: 0, queue: [], ack: 0, kills: 0, deaths: 0, team: -1, hostTeam: -1, using: false, caps: 0, plants: 0, defuses: 0, stats: {}, kit: gunKit("rifle"), swingAt: 0, meleeReadyAt: 0 }
+    return { id, name, human: !brain, brain, x: 0, y: 0, vx: 0, vy: 0, aim: 0, alive: false, respawnAt: 0, cooldownUntil: 0, readyAt: 0, gun: "rifle", pick: "rifle", equip: "frag", equipLeft: 0, equipPick: "frag", triggerHeld: false, health: HEALTH, hurtAt: 0, mag: 0, reloadUntil: 0, queue: [], ack: 0, kills: 0, deaths: 0, team: -1, hostTeam: -1, using: false, caps: 0, plants: 0, defuses: 0, stats: {}, kit: gunKit("rifle"), swingAt: 0, meleeReadyAt: 0, npc: "" }
   }
 
   /** Puts a player where the mode says, else at the spawn farthest from everyone alive. */
@@ -252,8 +272,8 @@ export class World {
     p.vx = 0
     p.vy = 0
     p.alive = true
-    p.health = HEALTH
     const kit = this.mode.loadout(this, p)
+    p.health = kit.health ?? HEALTH
     this.arm(p, kit)
     p.equip = kit.equip ?? p.equipPick
     p.equipLeft = kit.equip ? kit.equipCount : 0
@@ -335,7 +355,8 @@ export class World {
       const pressed = !!kit.gun && intent.fire && ready && (kit.auto || !p.triggerHeld)
       if (pressed && p.reloadUntil === 0 && p.swingAt === 0 && p.mag > 0 && this.time >= p.cooldownUntil) this.fire(p)
       if (ready || !intent.fire) p.triggerHeld = intent.fire
-      if (kit.regen && p.health < HEALTH && this.time - p.hurtAt >= REGEN_DELAY) p.health = Math.min(HEALTH, p.health + REGEN_RATE * DT)
+      const full = kit.health ?? HEALTH
+      if (kit.regen && p.health < full && this.time - p.hurtAt >= REGEN_DELAY) p.health = Math.min(full, p.health + REGEN_RATE * DT)
     }
     if (this.phase === "play") this.stepGear()
     if (this.phase === "play") this.mode.step(this)
@@ -545,7 +566,13 @@ export class World {
     this.begin()
   }
 
+  /** The mode's own players (zombies) go with the match. */
+  private purgeNpcs(): void {
+    for (const p of [...this.players.values()]) if (p.npc) this.remove(p.id)
+  }
+
   private begin(): void {
+    this.purgeNpcs()
     this.votes.clear()
     this.voteOptions = []
     this.match++
