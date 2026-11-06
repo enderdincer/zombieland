@@ -51,7 +51,7 @@ export class ModeHud {
   /** Dead in search and destroy: the living teammate the camera follows (sticking with one until they die). */
   spectate(g: Game): { x: number; y: number } | null {
     const s = g.snap
-    if (!s || s.phase !== "play" || (s.mode.id !== "snd" && s.mode.id !== "oitc") || g.alive || s.you?.respawnIn !== -1) return null
+    if (!s || s.phase !== "play" || (s.mode.id !== "snd" && s.mode.id !== "oitc" && !s.mode.zombies) || g.alive || s.you?.respawnIn !== -1) return null
     const team = teamOf(s, g.roster, g.myId)
     const alive = [...g.avatars.values()].filter((a) => a.alive)
     const mates = alive.filter((a) => teamOf(s, g.roster, a.id) === team)

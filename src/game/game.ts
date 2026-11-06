@@ -23,7 +23,8 @@ import { objectiveBanner } from "./objective-fx"
 import { type Kit, gunKit, kitSprints } from "../../shared/sim/kit"
 import { MELEE } from "../../shared/sim/melee"
 import { MODES } from "../../shared/sim/modes"
-import { INF_COLORS, eyes, infected } from "./rules-fx"
+import { INF_COLORS, ZOMBIE_COLORS, eyes, infected, zombieOf } from "./rules-fx"
+import { ZOMBIES, type ZombieKind } from "../../shared/sim/modes-zombie"
 import { carries, slowCarrier } from "../../shared/sim/modes-objective"
 
 export type Rgb3 = [number, number, number]
@@ -204,6 +205,8 @@ export class Game {
 
   /** Team colour in team modes, else the palette by roster position. */
   colorOf(id: string): Rgb3 {
+    const z = zombieOf(this.snap, id)
+    if (z) return ZOMBIE_COLORS[z] ?? INF_COLORS[1]
     const team = teamOf(this.snap, this.roster, id)
     if (team >= 0 && this.snap?.mode.id === "inf") return INF_COLORS[team === 1 ? 1 : 0]
     if (team >= 0) return TEAM_COLORS[team]!
@@ -212,6 +215,8 @@ export class Game {
   }
 
   nameOf(id: string): string {
+    const z = zombieOf(this.snap, id)
+    if (z) return ZOMBIES[z as ZombieKind]?.label ?? "ZOMBIE"
     return this.roster.find((r) => r.id === id)?.name ?? ""
   }
 
@@ -386,6 +391,15 @@ export class Game {
           v.body = null
           this.blood(v.x, v.y, Math.atan2(e.dy, e.dx), 2)
         }
+        // The horde would flood the feed: only brutes, and whoever the dead get, make it in.
+        const z = zombieOf(this.snap, e.victim)
+        if (z && z !== "brute") {
+          if (e.killer === this.myId) {
+            this.killAt = t
+            this.sound.hit(true)
+          }
+          return
+        }
         this.feed.unshift({ killer: this.nameOf(e.killer), victim: this.nameOf(e.victim), kc: this.colorOf(e.killer), vc: this.colorOf(e.victim), how: e.how, t, mine: e.killer === this.myId || mine })
         this.feed.length = Math.min(this.feed.length, 5)
         if (e.killer === this.myId) {
@@ -439,8 +453,14 @@ export class Game {
         const a = this.avatars.get(e.by)
         if (a) swing(a, t)
         if (a && me && Math.hypot(a.x - me.x, a.y - me.y) < 14) this.sound.swipe(a.x - me.x, a.y - me.y, false)
+        const z = zombieOf(this.snap, e.by)
+        if (z && a && me && Math.random() < 0.5) this.sound.groan(a.x - me.x, a.y - me.y, z === "brute")
         return
       }
+      case "wave":
+        this.banner = { text: e.what === "start" ? `WAVE ${e.n}` : `WAVE ${e.n} CLEARED`, t }
+        this.sound.beep(0, 0)
+        return
       case "end":
         return
       case "host":
@@ -895,6 +915,13 @@ export class Game {
       if (infected(snap, this.roster, a.id)) eyes(a, t, (...e) => this.sprite(...e))
       const gc = glow(col, 0.9)
       this.sprite(true, a.x, 0.03, a.y, 0.48, gc[0], gc[1], gc[2], 0.9, 2, 0, 0.14)
+      // Now and then a nearby zombie groans.
+      const zk = zombieOf(snap, a.id)
+      if (zk && this.body && Math.random() < dt * 0.12) {
+        const dx = a.x - this.body.x
+        const dy = a.y - this.body.y
+        if (Math.hypot(dx, dy) < 16) this.sound.groan(dx, dy, zk === "brute")
+      }
     }
     const me = this.alive ? this.body : null
     if (me) {

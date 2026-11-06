@@ -5,6 +5,7 @@ import type { Equip, Gun } from "../../shared/config"
 import { hostRestart, moveTeam, shuffleTeams } from "../../shared/sim/host"
 import { MODES, type ModeId } from "../../shared/sim/modes"
 import { type SimEvent, World } from "../../shared/sim/world"
+import { isZombieMode } from "../../shared/sim/modes-zombie"
 
 /** What the game loop needs from a match, whether it runs in this tab or in a room on the server. */
 export interface Session {
@@ -22,6 +23,9 @@ export interface Session {
   close(): void
 }
 
+/** Practice seats: 3 on 3 in team modes, four in free for all, you and one bot against the dead. */
+const practiceBots = (mode: ModeId) => (isZombieMode(mode) ? 2 : MODES[mode].teams ? 6 : 4)
+
 /** Dev practice against bots without a server: the same World runs in the tab. */
 export class LocalSession implements Session {
   readonly room = null
@@ -35,7 +39,7 @@ export class LocalSession implements Session {
   constructor(name: string, gun: Gun, equip: Equip, mode: ModeId = "ffa") {
     this.world = new World((Math.random() * 2 ** 31) | 0, null, mode)
     // Local practice (dev only, ?practice) is the one place with bots: 3 on 3 in team modes.
-    this.world.botFill = MODES[mode].teams ? 6 : 4
+    this.world.botFill = practiceBots(mode)
     this.world.addHuman(this.myId, name, gun, equip)
     this.publish()
   }
@@ -63,7 +67,7 @@ export class LocalSession implements Session {
     else if (msg.type === "shuffle") shuffleTeams(this.world, this.myId)
     else if (msg.type === "host" && hostRestart(this.world, this.myId, msg.action === "mode" ? msg.mode : this.world.mode.id, msg.newFloor)) {
       // Practice keeps its 3 on 3 in team modes.
-      this.world.botFill = MODES[this.world.mode.id].teams ? 6 : 4
+      this.world.botFill = practiceBots(this.world.mode.id)
       this.world.fill()
     }
   }

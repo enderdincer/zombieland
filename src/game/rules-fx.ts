@@ -9,8 +9,18 @@ export const INF_COLORS: [Rgb, Rgb] = [
   [0.35, 1.0, 0.12],
 ]
 
-/** Whether someone is infected right now. */
-export const infected = (s: Snapshot | null, roster: RosterRow[], id: string): boolean => s?.mode.id === "inf" && roster.find((r) => r.id === id)?.team === 1
+/** Zombies by kind: a sickly green walker, a yellower runner, a blood-dark brute. */
+export const ZOMBIE_COLORS: Record<string, Rgb> = {
+  walker: [0.35, 1.0, 0.12],
+  runner: [0.85, 1.0, 0.1],
+  brute: [0.9, 0.12, 0.08],
+}
+
+/** A zombie's kind, from the snapshot, or "" for anyone else. */
+export const zombieOf = (s: Snapshot | null, id: string): string => s?.players.find((p) => p.id === id)?.z ?? ""
+
+/** Whether someone is infected right now, or one of the dead. */
+export const infected = (s: Snapshot | null, roster: RosterRow[], id: string): boolean => (s?.mode.id === "inf" && roster.find((r) => r.id === id)?.team === 1) || !!zombieOf(s, id)
 
 type Sprite = (add: boolean, x: number, y: number, z: number, size: number, r: number, g: number, b: number, a: number, kind: number) => void
 

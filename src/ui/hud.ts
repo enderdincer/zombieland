@@ -105,7 +105,8 @@ export class Hud {
 
     const keep = new Set<string>()
     for (const a of g.avatars.values()) {
-      if (!a.alive) continue
+      // The horde goes unnamed.
+      if (!a.alive || g.snap?.players.some((q) => q.id === a.id && q.z)) continue
       const p = cam.project(a.x, 2.15, a.y, w, h)
       if (!p.ok) continue
       keep.add(a.id)

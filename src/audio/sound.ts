@@ -284,6 +284,18 @@ export class Sound {
     this.burst(dest, t + 0.03, "bandpass", 700, 1.4, 0.55, 0.05, 0.16, 2.4)
   }
 
+  /** A zombie's groan: a low, wavering moan, a little different every time. */
+  groan(dx: number, dy: number, big: boolean): void {
+    const dest = this.out(dx, dy, big ? 0.5 : 0.32, 0.25)
+    if (!dest) return
+    const t = this.ctx!.currentTime
+    const f = (big ? 70 : 105) * (0.85 + Math.random() * 0.3)
+    const d = 0.5 + Math.random() * 0.5
+    this.tone(dest, t, f, f * 0.7, 0.35, d, "sawtooth", 0.12)
+    this.tone(dest, t + 0.05, f * 1.5, f * 1.1, 0.12, d * 0.8, "triangle", 0.1)
+    this.burst(dest, t, "bandpass", 500, 1.5, 0.2, 0.1, d, 0.6)
+  }
+
   /** A melee swipe: a fast whoosh through the air. */
   swipe(dx: number, dy: number, mine: boolean): void {
     const dest = this.out(dx, dy, mine ? 0.45 : 0.55, 0.08)

@@ -1,6 +1,7 @@
 import { MODES, SND } from "../../shared/sim/modes"
 import type { RosterRow, Snapshot } from "../../shared/sim/view"
 import { type Where, objectiveSprites } from "./objective-fx"
+import { zombieSprites } from "./zombie-fx"
 
 export type Rgb = [number, number, number]
 /** Orange and cyan, the first two colours of the free-for-all palette. */
@@ -15,7 +16,8 @@ export const teamsOn = (s: Snapshot | null) => !!s && MODES[s.mode.id].teams
 /** A player's team in a team mode, else -1. */
 export function teamOf(s: Snapshot | null, roster: RosterRow[], id: string): number {
   if (!teamsOn(s)) return -1
-  return roster.find((r) => r.id === id)?.team ?? -1
+  // Zombies aren't on the roster: they're the other side.
+  return roster.find((r) => r.id === id)?.team ?? (s!.players.some((p) => p.id === id && p.z) ? 1 : -1)
 }
 
 /** Whether holding the use key at (x, y) plants or defuses: the client roots you exactly as the server will. */
@@ -36,6 +38,7 @@ type Sprite = (add: boolean, x: number, y: number, z: number, size: number, r: n
 export function modeSprites(s: Snapshot | null, t: number, sprite: Sprite, where?: Where): void {
   if (!s) return
   objectiveSprites(s, t, TEAM_COLORS, sprite, where)
+  zombieSprites(s, t, sprite)
   for (const p of s.mode.points) {
     const c = p.owner >= 0 ? TEAM_COLORS[p.owner] : NEUTRAL
     const pulse = p.contested ? 0.6 + 0.4 * Math.sin(t * 12) : 1
