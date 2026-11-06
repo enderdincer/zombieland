@@ -1,0 +1,8 @@
+node_modules
+dist
+.wrangler
+.git
+.claude
+shots
+concept
+docs

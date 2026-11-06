@@ -12,5 +12,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["scripts/dev.ts"]
+  "include": ["scripts/dev.ts", "server/bun.ts"]
 }
