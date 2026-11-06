@@ -394,6 +394,39 @@ tr.me td {
   background: #ff3b30;
 }
 
+/* Stamina: a thin bar under health, faint when full, amber while winded. */
+#bl .st {
+  margin-top: 8px;
+  transition: opacity 0.4s;
+}
+
+#bl .st.full {
+  opacity: 0.35;
+}
+
+#stbar {
+  width: 280px;
+  height: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+#stbar i {
+  display: block;
+  height: 100%;
+  background: rgb(120, 200, 255);
+}
+
+#stbar.winded i {
+  background: #ffb020;
+  animation: winded 0.35s infinite alternate;
+}
+
+@keyframes winded {
+  to {
+    opacity: 0.4;
+  }
+}
+
 #br {
   position: absolute;
   right: 28px;

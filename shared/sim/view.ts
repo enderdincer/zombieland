@@ -1,5 +1,6 @@
 import type { Equip, Gun } from "../config"
 import type { Kit } from "./kit"
+import type { Stamina } from "./stamina"
 import type { ModeView } from "./modes"
 import type { Phase, World } from "./world"
 
@@ -27,7 +28,7 @@ export type Snapshot = {
   claymores: ClaymoreView[]
   mode: ModeView
   /** `respawnIn` is -1 when you're out until the next round. `kit` is what the mode armed you with. */
-  you: { health: number; mag: number; reloading: number; respawnIn: number; pick: Gun; equip: Equip; equipLeft: number; equipPick: Equip; kit: Kit } | null
+  you: { health: number; mag: number; reloading: number; respawnIn: number; pick: Gun; equip: Equip; equipLeft: number; equipPick: Equip; kit: Kit; stamina?: Stamina } | null
 }
 
 export function buildSnapshot(world: World, viewerId: string): Snapshot {
@@ -48,7 +49,7 @@ export function buildSnapshot(world: World, viewerId: string): Snapshot {
     grenades: world.grenades.map((g) => ({ id: g.id, by: g.by, x: g.x, y: g.y, z: g.z, vx: g.vx, vy: g.vy, vz: g.vz, fuse: Math.max(0, g.at - world.time) })),
     claymores: world.claymores.map((c) => ({ id: c.id, by: c.by, x: c.x, y: c.y, aim: c.aim, armed: world.time >= c.armAt, tripped: c.blowAt > 0 })),
     mode: world.mode.view(world, viewerId),
-    you: me ? { health: me.health, mag: me.mag, reloading: me.reloadUntil > 0 ? Math.max(0, me.reloadUntil - world.time) : 0, respawnIn: me.alive ? 0 : Number.isFinite(me.respawnAt) ? Math.max(0, me.respawnAt - world.time) : -1, pick: me.pick, equip: me.equip, equipLeft: me.equipLeft, equipPick: me.equipPick, kit: me.kit } : null,
+    you: me ? { health: me.health, mag: me.mag, reloading: me.reloadUntil > 0 ? Math.max(0, me.reloadUntil - world.time) : 0, respawnIn: me.alive ? 0 : Number.isFinite(me.respawnAt) ? Math.max(0, me.respawnAt - world.time) : -1, pick: me.pick, equip: me.equip, equipLeft: me.equipLeft, equipPick: me.equipPick, kit: me.kit, stamina: { ...me.stamina } } : null,
   }
 }
 

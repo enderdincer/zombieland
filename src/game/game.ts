@@ -11,6 +11,7 @@ import { buildLevel } from "../render/level-mesh"
 import { type Caster, type DynLight, LightCuller } from "../render/lighting"
 import { gearModels } from "../render/gear"
 import { HOLD, MUZZLE, SHOULDER, personModels } from "../render/person"
+import { zombieModels } from "../render/zombie"
 import { type Avatar, EV, type PartModels, type PushPart, animate, fire as shoot, glow, gunPoints, hit, newAvatar, pose, swing, useGear } from "./anim"
 import { type Corpse, type DeathStyle, type Debris, deathStyle, emitRagdoll, ragdoll, ragdollCentre, stepDebris, stepRagdoll } from "./ragdoll"
 import { type Batch, type FrameInput, INST_FLOATS, type Renderer, SPRITE_FLOATS } from "../render/renderer"
@@ -22,6 +23,7 @@ import { TEAM_COLORS, canUse, modeSprites, teamOf } from "./mode-fx"
 import { objectiveBanner } from "./objective-fx"
 import { type Kit, gunKit, kitSprints } from "../../shared/sim/kit"
 import { MELEE } from "../../shared/sim/melee"
+import { type Stamina, freshStamina, stepStamina } from "../../shared/sim/stamina"
 import { MODES } from "../../shared/sim/modes"
 import { INF_COLORS, ZOMBIE_COLORS, eyes, infected, zombieOf } from "./rules-fx"
 import { ZOMBIES, type ZombieKind } from "../../shared/sim/modes-zombie"
@@ -101,6 +103,8 @@ export class Game {
   private swingReady = 0
   private swingLand = 0
   mag = 0
+  /** Predicted sprint stamina, replayed from the server's like the body. */
+  stamina: Stamina = freshStamina()
   equip: Equip = "frag"
   equipLeft = 0
   /** The cursor on the floor, for the throw distance. */
@@ -133,6 +137,8 @@ export class Game {
   private hitSoundAt = -1
   private soundAt = new Map<string, number>()
   private models: PartModels
+  /** The dead: walkers and runners share a body, brutes have their own. Guns and the rest are the soldier's. */
+  private zModels: { walker: PartModels; brute: PartModels }
   private gear: { frag: number; claymore: number; led: number }
   private frame = new Float32Array(FRAME_FLOATS)
   private culler = new LightCuller()
@@ -160,11 +166,17 @@ export class Game {
       shin: reg(p.shin),
       foot: reg(p.foot),
       pump: reg(p.pump),
+      knife: reg(p.knife),
       gun: regGuns(p.gun),
       mag: regGuns(p.mag),
       casing: regGuns(p.casing),
       hole: reg(p.hole),
     }
+    const dead = (brute: boolean): PartModels => {
+      const z = zombieModels(brute)
+      return { ...this.models, pelvis: reg(z.pelvis), torso: reg(z.torso), head: reg(z.head), upperArm: reg(z.upperArm), foreArm: reg(z.foreArm), thigh: reg(z.thigh), shin: reg(z.shin), foot: reg(z.foot) }
+    }
+    this.zModels = { walker: dead(false), brute: dead(true) }
     const gm = gearModels()
     this.gear = { frag: reg(gm.frag), claymore: reg(gm.claymore), led: reg(gm.led) }
     this.map = getMap(1)
@@ -253,6 +265,7 @@ export class Game {
         a.aim = p.aim
         a.gun = p.gun
         a.bare = !!p.bare
+        a.zombie = p.z ?? ""
         a.alive = p.alive
       }
       for (const id of [...this.avatars.keys()]) if (!s.players.some((p) => p.id === id)) this.avatars.delete(id)
@@ -289,6 +302,7 @@ export class Game {
       }
       this.place({ x: mine.x, y: mine.y, vx: 0, vy: 0 })
       this.pending = []
+      this.stamina = freshStamina()
       this.corpses = this.corpses.filter((c) => c.id !== this.myId)
     }
     this.wasAlive = mine.alive
@@ -304,7 +318,9 @@ export class Game {
     }
     this.pending = this.pending.filter((p) => p.seq > s.ack)
     const b: Body = { x: mine.x, y: mine.y, vx: mine.vx, vy: mine.vy }
-    for (const p of this.pending) stepBody(b, p.i.mx, p.i.my, kitSprints(p.i, this.kit) ? this.kit.run : this.kit.walk, this.solids, DT)
+    const st: Stamina = you?.stamina ? { ...you.stamina } : { ...this.stamina }
+    for (const p of this.pending) stepBody(b, p.i.mx, p.i.my, stepStamina(st, kitSprints(p.i, this.kit), DT) ? this.kit.run : this.kit.walk, this.solids, DT)
+    this.stamina = st
     // Adopt the replayed state exactly; a small correction is smoothed out of the drawn position, a big one snaps.
     if (this.body && Math.hypot(b.x - this.body.x, b.y - this.body.y) < 1.5) {
       this.drawn.correct(b.x - this.body.x, b.y - this.body.y)
@@ -327,6 +343,11 @@ export class Game {
     this.mag = kit.mag
     this.reloadUntil = 0
     this.swingLand = 0
+  }
+
+  /** Which body to draw: the soldier's, or one of the dead's by kind. */
+  private bodyModels(zombie: string): PartModels {
+    return !zombie ? this.models : zombie === "brute" ? this.zModels.brute : this.zModels.walker
   }
 
   private place(b: Body): void {
@@ -387,7 +408,7 @@ export class Game {
         const blast = e.how === "frag" || e.how === "claymore"
         if (v?.body) {
           this.corpses = this.corpses.filter((c) => c.id !== e.victim)
-          this.corpses.push({ id: e.victim, gun: v.gun, bare: v.bare, t0: t, rd: ragdoll(v.body, v.gun, v.svx, v.svy, e.dx, e.dy, blast ? blastStyle() : deathStyle(e.how as Gun), this.solids) })
+          this.corpses.push({ id: e.victim, gun: v.gun, bare: v.bare, z: v.zombie, t0: t, rd: ragdoll(v.body, v.gun, v.svx, v.svy, e.dx, e.dy, blast ? blastStyle() : deathStyle(e.how as Gun), this.solids) })
           v.body = null
           this.blood(v.x, v.y, Math.atan2(e.dy, e.dx), 2)
         }
@@ -571,7 +592,9 @@ export class Game {
       this.pending.push({ seq, i })
       if (this.pending.length > 90) this.pending.shift()
       this.drawn.tick(this.body)
-      const sprint = kitSprints(i, this.kit)
+      const sprint = stepStamina(this.stamina, kitSprints(i, this.kit), DT)
+      // Running dry ends a double-tap sprint: tap again once you've got your breath back.
+      if (this.stamina.winded) input.dash = false
       stepBody(this.body, i.mx, i.my, sprint ? this.kit.run : this.kit.walk, this.solids, DT)
       if (equip && this.equipLeft > 0) this.localEquip()
       this.localGun(fire, reload, sprint, melee)
@@ -597,8 +620,8 @@ export class Game {
     const t = this.now
     const kit = this.kit
     if ((melee || (!kit.gun && fire)) && kit.melee && t >= this.swingReady) {
-      this.swingReady = t + MELEE.cooldown
-      this.swingLand = t + MELEE.windup
+      this.swingReady = t + (kit.swing?.cooldown ?? MELEE.cooldown)
+      this.swingLand = t + (kit.swing?.windup ?? MELEE.windup)
       swing(this.avatarMe, t)
       this.sound.swipe(0, 0, true)
     }
@@ -911,8 +934,10 @@ export class Game {
       const vy = dt > 0 ? (ny - a.y) / dt : 0
       this.cues(a, animate(a, adt, t, nx, ny, a.vx + (vx - a.vx) * 0.3, a.vy + (vy - a.vy) * 0.3, a.aim), false)
       const col = this.colorOf(a.id)
-      pose(push, a, col, this.models)
-      if (infected(snap, this.roster, a.id)) eyes(a, t, (...e) => this.sprite(...e))
+      pose(push, a, col, this.bodyModels(a.zombie))
+      // The infected glow on the visor, the dead in their sockets, in their kind's colour.
+      if (a.zombie) eyes(a, t, (...e) => this.sprite(...e), col)
+      else if (infected(snap, this.roster, a.id)) eyes(a, t, (...e) => this.sprite(...e))
       const gc = glow(col, 0.9)
       this.sprite(true, a.x, 0.03, a.y, 0.48, gc[0], gc[1], gc[2], 0.9, 2, 0, 0.14)
       // Now and then a nearby zombie groans.
@@ -988,7 +1013,7 @@ export class Game {
       // Bare hands leave no gun behind.
       const m = this.models
       const pb: PushPart = c.bare ? (model, ...rest) => void (model !== m.gun[c.gun] && model !== m.mag[c.gun] && model !== m.pump && pushBody(model, ...rest)) : pushBody
-      emitRagdoll(pb, c.rd, c.gun, [col[0] * dim, col[1] * dim, col[2] * dim], this.models, 0, 1, sink)
+      emitRagdoll(pb, c.rd, c.gun, [col[0] * dim, col[1] * dim, col[2] * dim], this.bodyModels(c.z ?? ""), 0, 1, sink)
     }
     for (const [model, data] of bodies) emit(model, data)
 

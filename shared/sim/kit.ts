@@ -21,7 +21,7 @@ export type Kit = {
   cooldown: number
   /** Damage per bullet or pellet. */
   damage: number
-  /** V swings a one-hit melee attack (bare hands always can, with the trigger too). */
+  /** Right click or V swings the combat knife, a one-hit melee attack (bare hands always can, with the trigger too). */
   melee: boolean
   equip: Equip | null
   equipCount: number
@@ -39,10 +39,10 @@ export type Kit = {
 /** Melee overrides: damage per hit, seconds from press to hit and between presses, and reach in metres. */
 export type Swing = { damage: number; windup: number; cooldown: number; range: number }
 
-/** The usual loadout: the gun and equipment you picked. */
+/** The usual loadout: the gun and equipment you picked, and the combat knife. */
 export function gunKit(gun: Gun, equip: Equip | null = null, over: Partial<Kit> = {}): Kit {
   const g = GUNS[gun]
-  return { id: gun, label: g.label.toUpperCase(), gun, mag: g.mag, reload: true, auto: g.auto, cooldown: g.cooldown, damage: g.damage, melee: false, equip, equipCount: equip ? 1 : 0, walk: SPEED, run: SPRINT_SPEED, regen: true, ...over }
+  return { id: gun, label: g.label.toUpperCase(), gun, mag: g.mag, reload: true, auto: g.auto, cooldown: g.cooldown, damage: g.damage, melee: true, equip, equipCount: equip ? 1 : 0, walk: SPEED, run: SPRINT_SPEED, regen: true, ...over }
 }
 
 /** Bare hands: no gun, the trigger swings. */

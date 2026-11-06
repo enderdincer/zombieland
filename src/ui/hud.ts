@@ -23,13 +23,13 @@ export class Hud {
       <div id="tc"><span id="clock"></span></div>
       <div id="tr"></div>
       <div id="labels"></div>
-      <div id="bl"><div class="hp"><span>HEALTH</span><div id="hpbar"><i></i></div></div></div>
+      <div id="bl"><div class="hp"><span>HEALTH</span><div id="hpbar"><i></i></div></div><div class="hp st"><span>STAMINA</span><div id="stbar"><i></i></div></div></div>
       <div id="br"><div id="gname"></div><div id="ammo"><b id="mag"></b><span id="magmax"></span></div><div id="rbar"><i></i></div><div id="equip"></div></div>
       <div id="banner"></div>
       <div id="respawn"></div>
       <div id="xh"><i class="l"></i><i class="r"></i><i class="t"></i><i class="b"></i><div id="hm"><i></i><i></i><i></i><i></i></div></div>
       <div id="status"></div>
-      <div id="help">WASD move · MOUSE aim · CLICK shoot · SHIFT sprint · RIGHT CLICK look · R reload · G equipment · V melee · F plant/defuse · 1 2 3 guns · 4 5 frag/claymore · TAB scores · T teams · M mute</div>`
+      <div id="help">WASD move · MOUSE aim · CLICK shoot · SHIFT sprint · DOUBLE-TAP A MOVE KEY sprint · RIGHT CLICK / V knife · Q look · R reload · G equipment · F plant/defuse · 1 2 3 guns · 4 5 frag/claymore · TAB scores · T teams · M mute</div>`
     for (const e of root.querySelectorAll<HTMLElement>("[id]")) this.el[e.id] = e
   }
 
@@ -56,6 +56,10 @@ export class Hud {
     const bar = el.hpbar!.firstElementChild as HTMLElement
     bar.style.width = `${hp}%`
     el.hpbar!.classList.toggle("low", hp < 40)
+    const st = g.stamina
+    ;(el.stbar!.firstElementChild as HTMLElement).style.width = `${st.left * 100}%`
+    el.stbar!.classList.toggle("winded", st.winded)
+    el.stbar!.parentElement!.classList.toggle("full", st.left >= 1 && !st.winded)
     const gun = GUNS[g.gun]
     const kit = g.kit
     el.gname!.textContent = kit.label
@@ -66,7 +70,7 @@ export class Hud {
     const rb = el.rbar!.firstElementChild as HTMLElement
     rb.style.width = reloading ? `${(1 - (g.reloadUntil - t) / gun.reload) * 100}%` : "0%"
 
-    el.equip!.innerHTML = kit.equip ? `<span class="${g.equipLeft > 0 ? "" : "out"}">${equipLabel(g.equip)} ×${g.equipLeft}</span><kbd>G</kbd>` : kit.melee && kit.gun ? `<span>MELEE</span><kbd>V</kbd>` : ""
+    el.equip!.innerHTML = kit.equip ? `<span class="${g.equipLeft > 0 ? "" : "out"}">${equipLabel(g.equip)} ×${g.equipLeft}</span><kbd>G</kbd>` : kit.melee && kit.gun ? `<span>KNIFE</span><kbd>RMB</kbd>` : ""
 
     const b = g.banner && t - g.banner.t < 2.2 ? g.banner : null
     el.banner!.textContent = b?.text ?? ""
