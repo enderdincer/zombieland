@@ -13,5 +13,6 @@
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true
   },
-  "include": ["server", "shared"]
+  "include": ["server", "shared"],
+  "exclude": ["server/bun.ts"]
 }
