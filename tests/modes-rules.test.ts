@@ -71,12 +71,12 @@ describe("melee", () => {
     expect(a.meleeReadyAt).toBeGreaterThan(w.time)
   })
 
-  test("modes without melee ignore the key, and the protocol carries it", () => {
+  test("every mode has the combat knife, and the protocol carries the swing", () => {
     const w = modeWorld("ffa", ["a", "b"])
     place(w, "a", 15, 10)
     const b = place(w, "b", 16, 10)
     run(w, 0.4, (id) => (id === "a" ? { aim: east, melee: true } : {}))
-    expect(b.alive).toBe(true)
+    expect(b.alive).toBe(false)
     const m = decodeClient(JSON.stringify({ type: "intent", seq: 1, i: { melee: true } }))
     expect(m?.type === "intent" && m.i.melee).toBe(true)
   })

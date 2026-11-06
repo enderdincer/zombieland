@@ -151,7 +151,7 @@ async function main() {
       const spec = modeHud.spectate(game)
       const fx = spec?.x ?? body?.x ?? game.map.size[0] / 2
       const fz = spec?.y ?? body?.y ?? game.map.size[1] / 2
-      // Look-ahead: the view leans toward the cursor; holding right click leans much further (scouting, sniping).
+      // Look-ahead: the view leans toward the cursor; holding Q leans much further (scouting, sniping).
       const far = input.looking && alive
       const k = far ? 0.65 : 0.35
       const cap = far ? 11 : 5

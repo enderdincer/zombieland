@@ -38,6 +38,7 @@ export type PartModels = {
   shin: number
   foot: number
   pump: number
+  knife: number
   gun: Record<Gun, number>
   mag: Record<Gun, number>
   casing: Record<Gun, number>
@@ -74,6 +75,8 @@ export type Body = {
   gun: Frame | null
   pump: Frame | null
   mag: Frame | null
+  /** The combat knife in the left hand, out only during a swing with a gun. */
+  knife?: Frame | null
 }
 
 type Foot = { p: V3; yaw: number; pitch: number; planted: boolean; lift: V3; liftYaw: number }
@@ -142,6 +145,8 @@ export type Avatar = {
   /** No gun, just hands (infected claws, the gun game knife); and the last melee swing, on the animation clock. */
   bare: boolean
   swingAt: number
+  /** One of the dead (their kind): hunched, arms reaching, lurching, the brute's hanging low. */
+  zombie: string
 }
 
 export function newAvatar(id: string, x: number, y: number, aim: number, gun: Gun): Avatar {
@@ -202,6 +207,7 @@ export function newAvatar(id: string, x: number, y: number, aim: number, gun: Gu
     plantAt: -10,
     bare: false,
     swingAt: -10,
+    zombie: "",
   }
 }
 
@@ -602,7 +608,10 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   const twist = -Math.sin(th) * (0.22 + 0.12 * sprint) * moving
   let pelvis = yawFrame([px, h, pz], a.legYaw + twist)
   pelvis = pitch(pelvis, -0.12 * moving - 0.05)
-  pelvis = roll(pelvis, 0.06 * moving * Math.cos(th) + sway * 1.4)
+  // The dead lurch: a heavy roll onto each foot, a lopsided lean to one side.
+  const lurch = a.zombie ? 2.6 : 1
+  const lop = a.zombie ? (a.seed % 2 < 1 ? -1 : 1) * 0.07 : 0
+  pelvis = roll(pelvis, 0.06 * lurch * moving * Math.cos(th) + sway * 1.4 + lop)
 
   // Lean in the torso's own axes: travel lean and hit pushes come in plan space.
   const ca = Math.cos(a.aim)
@@ -637,7 +646,7 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   let torso = yawFrame(waist, torsoYaw)
   // Pitch and roll by the lean measured along the aim (the torso is bladed, so convert).
   const tb = torsoYaw - a.aim
-  const fwd = (a.bare ? 0.2 : 0) + 0.1 + 0.08 * moving + 0.2 * sprint + leanFwd * 2.2 - a.torsoKick.x + breath * 0.012 * still + reloadHunch + raise * 0.1
+  const fwd = (a.bare ? 0.2 : 0) + (a.zombie ? (a.zombie === "brute" ? 0.32 : 0.28) + Math.sin(t * 1.3 + a.seed) * 0.04 : 0) + 0.1 + 0.08 * moving + 0.2 * sprint + leanFwd * 2.2 - a.torsoKick.x + breath * 0.012 * still + reloadHunch + raise * 0.1
   const side = leanSide * 2.2 + Math.sin(2 * th) * 0.02 * moving
   torso = pitch(torso, -(fwd * Math.cos(tb) + side * Math.sin(tb)))
   torso = roll(torso, side * Math.cos(tb) - fwd * Math.sin(tb) * 0.4)
@@ -668,8 +677,9 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   gunF = pitch(gunF, a.recPitch.x + gunPitch - raise * 0.95 + Math.sin(t * 1.3 + a.seed) * sway2 + Math.sin(2 * th) * (0.025 + 0.05 * sprint) * moving + a.heat * 0.03 * Math.sin(t * 53))
   gunF = roll(gunF, a.recRoll.x + gunRoll + clamp(-a.aimVel * 0.03, -0.3, 0.3) + raise * 0.5)
   // A swing with a gun in hand: a bash, the gun driven forward.
-  const bash = sw && !a.bare ? Math.sin(Math.PI * sw.strike) * sw.back : 0
-  gunF = moved(gunF, at(gunF, -a.recBack.x - gunPull - raise * 0.12 + bash * 0.3, 0, 0))
+  // A swing with a gun in hand: the gun pulls in to the right while the left hand slashes with the knife.
+  const bash = sw && !a.bare ? Math.sin(Math.PI * Math.max(sw.wind, sw.strike)) * sw.back : 0
+  gunF = moved(gunF, at(gunF, -a.recBack.x - gunPull - raise * 0.12 - bash * 0.08, 0, bash * 0.06))
 
   // Hands.
   const pumpBack = g === "shotgun" ? scalarAt(clip?.pump, ct) : 0
@@ -687,7 +697,31 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   }
   let handL = handAt(clip?.left, false)
   let handR = handAt(clip?.right, true)
-  if (a.bare) {
+  if (sw && !a.bare) {
+    // The knife: the left hand drops to the hip to draw, then slashes up and across to the right, then back to the gun.
+    const draw = at(torso, 0.08, RIG.shoulderY - 0.25, -0.36)
+    const end = at(torso, 0.62, RIG.shoulderY - 0.05, 0.24)
+    handL = sw.strike > 0 ? (sw.back < 1 ? lerp3(handL, end, sw.back) : lerp3(draw, end, sw.strike)) : lerp3(handL, draw, sw.wind)
+  }
+  if (a.zombie) {
+    // Arms out ahead and drifting, never quite together; the brute's hang low and swing with its stride. A swipe
+    // rakes the right hand across, the brute's comes down overhead.
+    const brute = a.zombie === "brute"
+    const bl = Math.sin(t * 2.1 + a.seed) * 0.05
+    const br = Math.sin(t * 1.7 + a.seed * 1.3) * 0.05
+    if (brute) {
+      handL = at(torso, 0.12 + Math.sin(th) * 0.12 * moving, -0.02 + bl, -0.42)
+      handR = at(torso, 0.12 - Math.sin(th) * 0.12 * moving, -0.04 + br, 0.42)
+    } else {
+      handL = at(torso, 0.5, RIG.shoulderY - 0.06 + bl, -0.2 + br * 0.5)
+      handR = at(torso, 0.47, RIG.shoulderY - 0.14 + br, 0.22)
+    }
+    if (sw) {
+      const back = brute ? at(torso, -0.05, RIG.shoulderY + 0.4, 0.25) : at(torso, -0.08, RIG.shoulderY + 0.22, 0.42)
+      const end = brute ? at(torso, 0.6, -0.05, 0.05) : at(torso, 0.55, RIG.shoulderY - 0.15, -0.25)
+      handR = sw.strike > 0 ? (sw.back < 1 ? lerp3(handR, end, sw.back) : lerp3(back, end, sw.strike)) : lerp3(handR, back, sw.wind)
+    }
+  } else if (a.bare) {
     // Arms out ahead, clawing; a swing raises the right hand behind the shoulder and rakes it across.
     const bob = Math.sin(t * 5 + a.seed) * 0.03
     handL = at(torso, 0.42, RIG.shoulderY - 0.1 + bob, -0.17)
@@ -723,6 +757,12 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   let head = yawFrame(at(torso, 0.02, RIG.neckY, 0), a.aim + a.hitTwist.x * 1.6 + clamp(a.aimVel * 0.02, -0.25, 0.25))
   head = pitch(head, -0.1 - look * 1.1 - a.torsoKick.x * 0.6 - fwd * 0.3 + Math.sin(2 * th) * 0.03 * moving)
   head = roll(head, side * 0.5 - a.hitTwist.x * 0.5)
+  if (a.zombie) {
+    // Lolling to one side, chin up out of the hunch, twitching now and then.
+    const twitch = Math.sin(t * 13 + a.seed) * Math.max(0, Math.sin(t * 0.9 + a.seed * 2) - 0.85) * 1.5
+    head = pitch(head, 0.45 + twitch * 0.3)
+    head = roll(head, (a.seed % 2 < 1 ? 1 : -1) * 0.32 + twitch)
+  }
 
   // Legs.
   const th2: Frame[] = []
@@ -746,7 +786,7 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   else if (magState === "hand") mag = moved(gunF, at(fa[0], 0, -RIG.fore - 0.02, 0))
   const pump = g === "shotgun" ? moved(gunF, at(gunF, pts.fore - pumpBack, 0.005, 0)) : null
   if (a.bare) return { pelvis, torso, head, ua, fa, th: [th2[0]!, th2[1]!], sh: [sh2[0]!, sh2[1]!], ft: [ft2[0]!, ft2[1]!], gun: null, pump: null, mag: null }
-  return { pelvis, torso, head, ua, fa, th: [th2[0]!, th2[1]!], sh: [sh2[0]!, sh2[1]!], ft: [ft2[0]!, ft2[1]!], gun: gunF, pump, mag }
+  return { pelvis, torso, head, ua, fa, th: [th2[0]!, th2[1]!], sh: [sh2[0]!, sh2[1]!], ft: [ft2[0]!, ft2[1]!], gun: gunF, pump, mag, knife: sw ? fa[0] : null }
 }
 
 /** The team colour (sRGB-ish palette) as a linear glow, so accents stay saturated through tone mapping. */
@@ -770,6 +810,7 @@ export function emitBody(push: PushPart, b: Body, gun: Gun, rgb: Rgb3, models: P
   if (b.gun) emit(push, models.gun[gun], b.gun, color, 0, alpha)
   if (b.pump) emit(push, models.pump, b.pump, color, 0, alpha)
   if (b.mag) emit(push, models.mag[gun], b.mag, color, 0, alpha)
+  if (b.knife) emit(push, models.knife, b.knife, color, 0, alpha)
 }
 
 /** Pushes the parts of one living soldier in its current pose. */

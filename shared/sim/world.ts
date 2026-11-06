@@ -12,6 +12,7 @@ import "./modes-rules"
 import "./modes-zombie"
 import { type Kit, gunKit, kitSprints } from "./kit"
 import { canSwing, startSwing, stepSwing } from "./melee"
+import { type Stamina, freshStamina, stepStamina } from "./stamina"
 
 export type Phase = "play" | "end"
 
@@ -83,6 +84,8 @@ export type Player = {
    * and gone when the match ends.
    */
   npc: string
+  /** Sprint stamina (shared/sim/stamina.ts). */
+  stamina: Stamina
 }
 
 export type SimEvent =
@@ -251,7 +254,7 @@ export class World {
   }
 
   private newPlayer(id: string, name: string, brain: Brain | null): Player {
-    return { id, name, human: !brain, brain, x: 0, y: 0, vx: 0, vy: 0, aim: 0, alive: false, respawnAt: 0, cooldownUntil: 0, readyAt: 0, gun: "rifle", pick: "rifle", equip: "frag", equipLeft: 0, equipPick: "frag", triggerHeld: false, health: HEALTH, hurtAt: 0, mag: 0, reloadUntil: 0, queue: [], ack: 0, kills: 0, deaths: 0, team: -1, hostTeam: -1, using: false, caps: 0, plants: 0, defuses: 0, stats: {}, kit: gunKit("rifle"), swingAt: 0, meleeReadyAt: 0, npc: "" }
+    return { id, name, human: !brain, brain, x: 0, y: 0, vx: 0, vy: 0, aim: 0, alive: false, respawnAt: 0, cooldownUntil: 0, readyAt: 0, gun: "rifle", pick: "rifle", equip: "frag", equipLeft: 0, equipPick: "frag", triggerHeld: false, health: HEALTH, hurtAt: 0, mag: 0, reloadUntil: 0, queue: [], ack: 0, kills: 0, deaths: 0, team: -1, hostTeam: -1, using: false, caps: 0, plants: 0, defuses: 0, stats: {}, kit: gunKit("rifle"), swingAt: 0, meleeReadyAt: 0, npc: "", stamina: freshStamina() }
   }
 
   /** Puts a player where the mode says, else at the spawn farthest from everyone alive. */
@@ -274,6 +277,7 @@ export class World {
     p.alive = true
     const kit = this.mode.loadout(this, p)
     p.health = kit.health ?? HEALTH
+    p.stamina = freshStamina()
     this.arm(p, kit)
     p.equip = kit.equip ?? p.equipPick
     p.equipLeft = kit.equip ? kit.equipCount : 0
@@ -338,7 +342,8 @@ export class World {
         continue
       }
       const kit = p.kit
-      const sprint = kitSprints(intent, kit)
+      // Only while there's stamina for it; walking refills it.
+      const sprint = stepStamina(p.stamina, kitSprints(intent, kit), DT)
       stepBody(p, intent.mx, intent.my, sprint ? kit.run : kit.walk, this.solids, DT)
       if (sprint && kit.gun) p.readyAt = this.time + SPRINT_TO_FIRE
       if (p.reloadUntil > 0 && this.time >= p.reloadUntil) {

@@ -219,6 +219,25 @@ function gun(g: Gun): Mesh {
   return m
 }
 
+/**
+ * The combat knife, in the left forearm's frame (like the hand): the grip in the fist at the end of the bone, a guard,
+ * then a clip-point blade reaching on past the knuckles along -y.
+ */
+function knife(): Mesh {
+  const m = new Body()
+  const STEEL = hex(0xc4c9d2)
+  m.box(-0.016, -0.345, -0.02, 0.016, -0.22, 0.02, hex(0x1b1d22))
+  for (const y of [-0.31, -0.28, -0.25]) m.box(-0.018, y - 0.006, -0.022, 0.018, y + 0.006, 0.022, METAL)
+  m.box(-0.026, -0.36, -0.045, 0.026, -0.345, 0.045, METAL_L)
+  m.box(-0.0, -0.56, -0.006, 0.032, -0.36, 0.006, STEEL, MAT.lit, 0, hex(0xe6eaf0))
+  m.box(-0.012, -0.52, -0.005, 0.0, -0.36, 0.005, hex(0x8e939c))
+  // The tip: a sloped point and a glint on the edge.
+  m.facet([0.032, -0.56, 0.006], [0.0, -0.56, 0.006], [0.0, -0.62, 0.0], STEEL)
+  m.facet([0.0, -0.56, -0.006], [0.032, -0.56, -0.006], [0.0, -0.62, 0.0], STEEL)
+  m.box(0.03, -0.55, -0.004, 0.034, -0.38, 0.004, hex(0xffffff), MAT.glow, 0.25)
+  return m
+}
+
 /** Magazine with its top at the origin. */
 function mag(g: Gun): Mesh {
   const m = new Body()
@@ -281,6 +300,7 @@ export type PersonModels = {
   shin: Mesh
   foot: Mesh
   pump: Mesh
+  knife: Mesh
   gun: Record<Gun, Mesh>
   mag: Record<Gun, Mesh>
   casing: Record<Gun, Mesh>
@@ -289,5 +309,5 @@ export type PersonModels = {
 
 export function personModels(): PersonModels {
   const by = <T>(f: (g: Gun) => T) => Object.fromEntries(GUN_IDS.map((g) => [g, f(g)])) as Record<Gun, T>
-  return { pelvis: pelvis(), torso: torso(), head: head(), upperArm: upperArm(), foreArm: foreArm(), thigh: thigh(), shin: shin(), foot: foot(), pump: pump(), gun: by(gun), mag: by(mag), casing: by(casing), hole: hole() }
+  return { pelvis: pelvis(), torso: torso(), head: head(), upperArm: upperArm(), foreArm: foreArm(), thigh: thigh(), shin: shin(), foot: foot(), pump: pump(), knife: knife(), gun: by(gun), mag: by(mag), casing: by(casing), hole: hole() }
 }

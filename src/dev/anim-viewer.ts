@@ -1,6 +1,7 @@
 // Dev-only animation viewer (anim.html): scripted soldiers running, strafing, stopping, firing, reloading and dying,
 // played through the real Game and Renderer. ?only=a,b picks actors, ?slow=0.25 slows time, ?zoom=9 sets the camera
-// distance, ?manual stops the loop so window.advance(ms) can step it for frame captures.
+// distance, ?manual stops the loop so window.advance(ms) can step it for frame captures. Actors z1-z3 are the dead
+// (walker, runner, brute) and k swings the combat knife.
 import { GUNS, SPEED, SPRINT_SPEED, type Gun } from "../../shared/config"
 import { raycast } from "../../shared/geom"
 import type { MapDef } from "../../shared/maps"
@@ -55,6 +56,10 @@ type Actor = {
   at(t: number): { x: number; y: number; aim: number; alive: boolean }
   shots?: (t: number) => number
   reloads?: (t: number) => number
+  /** Melee swings started by time t. */
+  swings?: (t: number) => number
+  /** One of the dead: its kind. */
+  z?: string
 }
 
 const loop = (t: number, p: number) => ((t % p) + p) % p
@@ -134,6 +139,12 @@ const ACTORS: Actor[] = [
       return { x: 21 + Math.cos(t * 1.6) * 1.2, y: 14 + Math.sin(t * 1.6) * 1.2, aim: t * 1.6 + Math.PI / 2, alive: c < 1.5 }
     },
   },
+  // The dead: a walker shambling back and forth, a runner on a loop, a brute; each swipes now and then.
+  { id: "z1", gun: "rifle", z: "walker", swings: (t) => Math.floor(t / 2.2), at: (t) => ({ x: 4 + Math.abs(loop(t * 0.35, 4) - 2) * 3, y: 7, aim: loop(t * 0.35, 4) < 2 ? 0 : Math.PI, alive: true }) },
+  { id: "z2", gun: "rifle", z: "runner", swings: (t) => Math.floor(t / 1.6), at: (t) => ({ x: 22 + Math.cos(t * 0.9) * 3, y: 9 + Math.sin(t * 0.9) * 3, aim: t * 0.9 + Math.PI / 2, alive: true }) },
+  { id: "z3", gun: "rifle", z: "brute", swings: (t) => Math.floor(t / 2.6), at: (t) => ({ x: 4, y: 13 + Math.sin(t * 0.4) * 2, aim: Math.cos(t * 0.4) > 0 ? Math.PI / 2 : -Math.PI / 2, alive: true }) },
+  // Knife swings with a rifle in hand, standing still.
+  { id: "k", gun: "rifle", swings: (t) => Math.floor(t / 1.1), at: () => ({ x: 15, y: 10, aim: 0, alive: true }) },
 ]
 
 class ScriptSession implements Session {
@@ -144,6 +155,7 @@ class ScriptSession implements Session {
   private snap: { snap: Snapshot; at: number } | null = null
   private actors: Actor[]
   private prev = new Map<string, { x: number; y: number; shots: number; reloads: number; alive: boolean }>()
+  private swung = new Map<string, number>()
   private kills = 0
 
   constructor(only: string[] | null) {
@@ -178,6 +190,9 @@ class ScriptSession implements Session {
       const vy = dt > 0 ? (s.y - p.y) / dt : 0
       const shots = a.shots?.(t) ?? 0
       const reloads = a.reloads?.(t) ?? 0
+      const swings = a.swings?.(t) ?? 0
+      if (swings > (this.swung.get(a.id) ?? 0)) this.events.push({ k: "swing", by: a.id })
+      this.swung.set(a.id, swings)
       if (shots > p.shots) {
         const g = GUNS[a.gun]
         for (let k = 0; k < g.pellets; k++) {
@@ -205,7 +220,7 @@ class ScriptSession implements Session {
         }
       }
       this.prev.set(a.id, { x: s.x, y: s.y, shots, reloads, alive: s.alive })
-      players.push({ id: a.id, x: s.x, y: s.y, vx, vy, aim: s.aim, alive: s.alive, gun: a.gun, health: 100 })
+      players.push({ id: a.id, x: s.x, y: s.y, vx, vy, aim: s.aim, alive: s.alive, gun: a.gun, health: 100, ...(a.z ? { z: a.z, bare: true } : {}) })
     }
     this.snap = { snap: { type: "snap", tick: Math.floor(t * 30), t, ack: 0, phase: "play", left: 300, map: SEED, players, grenades: [], claymores: [], mode: IDLE_VIEW, you: null }, at: performance.now() }
   }

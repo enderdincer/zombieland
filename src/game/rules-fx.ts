@@ -24,13 +24,15 @@ export const infected = (s: Snapshot | null, roster: RosterRow[], id: string): b
 
 type Sprite = (add: boolean, x: number, y: number, z: number, size: number, r: number, g: number, b: number, a: number, kind: number) => void
 
-/** Two glowing eyes on the visor, flickering a little. */
-export function eyes(a: Avatar, t: number, sprite: Sprite): void {
+/** Two glowing eyes on the visor (or in a zombie's sockets, in its colour), flickering a little. */
+export function eyes(a: Avatar, t: number, sprite: Sprite, color?: Rgb): void {
   const h = a.body?.head
   if (!h) return
   const k = 0.85 + 0.15 * Math.sin(t * 9 + a.seed)
+  const [fwd, up, gap] = a.zombie ? (a.zombie === "brute" ? [0.12, 0.18, 0.05] : [0.105, 0.155, 0.043]) : [0.17, 0.165, 0.05]
+  const c = color ? [color[0] * 3, color[1] * 3, color[2] * 3] : [1.6, 3, 0.3]
   for (const side of [-1, 1]) {
-    const p = at(h, 0.17, 0.165, side * 0.05)
-    sprite(true, p[0], p[1], p[2], 0.05, 1.6 * k, 3 * k, 0.3 * k, 1, 0)
+    const p = at(h, fwd, up, side * gap)
+    sprite(true, p[0], p[1], p[2], 0.045, c[0]! * k, c[1]! * k, c[2]! * k, 1, 0)
   }
 }
