@@ -342,7 +342,7 @@ describe("rooms", () => {
     mock.module("cloudflare:workers", () => ({ DurableObject: class {} }))
     const { RoomCore } = await import("../server/room")
     const core = new RoomCore("abcd")
-    expect(core.world.mode.id).toBe("ffa")
+    expect(core.world.mode.id).toBe("zsv")
     expect(core.setMode("snd")).toBe(true)
     expect(core.world.mode.id).toBe("snd")
     const sent: string[] = []

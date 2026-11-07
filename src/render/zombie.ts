@@ -40,9 +40,11 @@ class Flesh extends Mesh {
 const acc = (m: Mesh, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => m.box(x0, y0, z0, x1, y1, z1, ACC, MAT.accent)
 
 /** Widths for the walker and the brute: torso (front-back, side-side), arms and legs. */
-type Build = { brute: boolean; tx: number; tz: number; arm: number; leg: number }
+type Build = { brute: boolean; boss?: boolean; tx: number; tz: number; arm: number; leg: number }
 const WALKER: Build = { brute: false, tx: 1, tz: 1, arm: 1, leg: 1 }
 const BRUTE: Build = { brute: true, tx: 1.45, tz: 1.35, arm: 1.6, leg: 1.35 }
+/** The boss: a brute grown huge, bone breaking through its back and glowing cracks across its hide. */
+const BOSS: Build = { brute: true, boss: true, tx: 1.75, tz: 1.65, arm: 2, leg: 1.6 }
 
 function pelvis(b: Build): Mesh {
   const m = new Flesh()
@@ -73,6 +75,21 @@ function torso(b: Build): Mesh {
     m.box(-0.12, 0.56, -0.12, -0.02, 0.565, 0.02, BLOOD)
     for (const z of [-0.2, -0.12, -0.04, 0.04, 0.12, 0.2]) m.box(-0.06, 0.5, z - 0.008, 0.02, 0.505, z + 0.008, BONE)
     m.box(-0.2, 0.3, 0.12, -0.15, 0.5, 0.28, GRIME)
+    if (b.boss) {
+      // Bone spines up the back and across the shoulders, and the glow seeping through cracks in the hide.
+      for (const [x, z, h] of [
+        [-0.17, -0.2, 0.16],
+        [-0.15, 0, 0.22],
+        [-0.17, 0.2, 0.16],
+        [-0.06, -0.28, 0.12],
+        [-0.06, 0.28, 0.12],
+      ] as const)
+        m.box(x - 0.025, 0.55, z - 0.025, x + 0.025, 0.55 + h, z + 0.025, BONE)
+      acc(m, 0.2, 0.12, -0.2, 0.206, 0.14, 0.1)
+      acc(m, 0.2, 0.32, -0.05, 0.206, 0.46, -0.03)
+      acc(m, -0.205, 0.18, -0.25, -0.2, 0.2, 0.0)
+      acc(m, -0.1, 0.565, -0.15, 0.05, 0.57, -0.13)
+    }
     return m
   }
   // Abdomen, then the chest in a torn shirt, skin and ribs showing through the rips.
@@ -99,7 +116,7 @@ function torso(b: Build): Mesh {
 
 function head(b: Build): Mesh {
   const m = new Flesh()
-  const s = b.brute ? 1.15 : 1
+  const s = b.boss ? 1.3 : b.brute ? 1.15 : 1
   m.box(-0.05 * s, -0.02, -0.05 * s, 0.05 * s, 0.08, 0.05 * s, SKIN_D)
   // Skull, a slack jaw hanging open over a dark mouth with a few teeth.
   m.box(-0.09 * s, 0.07, -0.085 * s, 0.09 * s, 0.25 * s, 0.085 * s, SKIN)
@@ -192,8 +209,8 @@ function foot(b: Build): Mesh {
 
 export type ZombieParts = { pelvis: Mesh; torso: Mesh; head: Mesh; upperArm: Mesh; foreArm: Mesh; thigh: Mesh; shin: Mesh; foot: Mesh }
 
-/** The body parts of a walker (also the runner's) or a brute. Guns and the rest come from the soldier's set. */
-export function zombieModels(brute = false): ZombieParts {
-  const b = brute ? BRUTE : WALKER
+/** The body parts of a walker (also the runner's and sprinter's), a brute or the boss. Guns and the rest are the soldier's. */
+export function zombieModels(kind: "walker" | "brute" | "boss" = "walker"): ZombieParts {
+  const b = kind === "boss" ? BOSS : kind === "brute" ? BRUTE : WALKER
   return { pelvis: pelvis(b), torso: torso(b), head: head(b), upperArm: upperArm(b), foreArm: foreArm(b), thigh: thigh(b), shin: shin(b), foot: foot(b) }
 }

@@ -27,6 +27,9 @@ export const MODES: Record<ModeId, { label: string; short: string; blurb: string
   zhold: { label: "Hold the line", short: "HOLD", blurb: "Co-op: keep the horde out of the zone for eight waves. Its integrity is your life.", teams: true },
 }
 
+/** What a room plays when nobody picked: quick join with no mode, a room's first start, practice. */
+export const DEFAULT_MODE: ModeId = "zsv"
+
 export const modeOf = (v: unknown): ModeId | null => ((MODE_IDS as readonly unknown[]).includes(v) ? (v as ModeId) : null)
 
 export const TEAM_NAMES = ["ORANGE", "CYAN"] as const

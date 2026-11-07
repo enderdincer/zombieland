@@ -4,7 +4,7 @@ import "@fontsource/ibm-plex-mono/500.css"
 import { EQUIP_IDS, type Equip, GUN_IDS, type Gun } from "../shared/config"
 import { cleanName } from "../shared/protocol"
 import type { Snapshot } from "../shared/sim/view"
-import { MODE_IDS, type ModeId, modeOf } from "../shared/sim/modes"
+import { DEFAULT_MODE, MODE_IDS, type ModeId, modeOf } from "../shared/sim/modes"
 import { Music } from "./audio/music"
 import { Sound } from "./audio/sound"
 import { Game } from "./game/game"
@@ -46,7 +46,7 @@ function threat(g: Game): number {
   if (z.state === "break") return 0.12
   if (!g.alive || !g.body) return 0.45
   let near = 0
-  for (const a of g.avatars.values()) if (a.alive && a.zombie && Math.hypot(a.x - g.body.x, a.y - g.body.y) < 9) near += a.zombie === "brute" ? 2 : 1
+  for (const a of g.avatars.values()) if (a.alive && a.zombie && Math.hypot(a.x - g.body.x, a.y - g.body.y) < 9) near += a.zombie === "boss" ? 4 : a.zombie === "brute" ? 2 : 1
   return 0.3 + Math.min(0.5, near * 0.1) + (g.health < 50 ? 0.2 : 0)
 }
 
@@ -93,7 +93,7 @@ async function main() {
     sound.start()
     session = s(clean)
     game = new Game(renderer, session, sound)
-    game.onWave = (what) => (what === "start" ? music?.sting() : music?.resolve())
+    game.onWave = (what) => (what === "clear" ? music?.resolve() : music?.sting())
     const bus = sound.musicBus()
     if (bus && !music) music = new Music(bus.ctx, bus.out)
     menus.hide()
@@ -129,7 +129,8 @@ async function main() {
   let scores = false
   const failed = (e: unknown) => menus.landing(null, `Couldn't reach the server (${e instanceof Error ? e.message : String(e)}).`)
   const menus = new Menus(menuEl, localStorage.getItem(NAME_KEY) ?? "", {
-    quick: (name) => api("quick").then((r) => enter(name, r.room), failed),
+    // Quick join finds (or starts) a public room in the picked mode.
+    quick: (name, mode) => api(`quick?mode=${mode}`).then((r) => enter(name, r.room, false, mode), failed),
     create: (name, mode) => api("create").then((r) => enter(name, r.room, true, mode), failed),
     join: (name, room) => enter(name, room),
     vote,
@@ -172,8 +173,8 @@ async function main() {
   const rejoin = sessionStorage.getItem(REJOIN_KEY)
   sessionStorage.removeItem(REJOIN_KEY)
   if (rejoin && rejoin === roomParam) enter(localStorage.getItem(NAME_KEY) ?? "", rejoin)
-  // Dev and screenshots: a local match against bots, no server.
-  if (params.has("practice")) begin(localStorage.getItem(NAME_KEY) ?? "you", (n) => new LocalSession(n, gun, equip, modeOf(params.get("mode")) ?? "ffa"))
+  // Dev and screenshots: a local match against bots, no server. Zombie modes take &wave=5 to start there.
+  if (params.has("practice")) begin(localStorage.getItem(NAME_KEY) ?? "you", (n) => new LocalSession(n, gun, equip, modeOf(params.get("mode")) ?? DEFAULT_MODE, Number(params.get("wave")) || 0))
 
   const resize = () => {
     const dpr = Math.min(devicePixelRatio, MAX_DPR)

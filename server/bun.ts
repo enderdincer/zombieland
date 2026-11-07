@@ -104,7 +104,7 @@ const server = Bun.serve<Socket, never>({
     const path = url.pathname.replace(/^\/labs\/blackout(?=\/|$)/, "")
     const now = Date.now()
     if (path === "/api/health") return new Response("ok", { headers: { "content-type": "text/plain" } })
-    if (path === "/api/quick") return json({ room: lobby.quick(now) })
+    if (path === "/api/quick") return json({ room: lobby.quick(now, modeOf(url.searchParams.get("mode")) ?? undefined) })
     if (path === "/api/create") return json({ room: lobby.create(now) })
     if (path === "/api/stats") return json(lobby.stats(now))
     const ws = path.match(/^\/ws\/([a-z0-9]{4,8})\/?$/)

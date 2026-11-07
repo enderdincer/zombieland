@@ -218,3 +218,26 @@ describe("zombie extras", () => {
     expect(buildSnapshot(w, "a").mode.zombies?.why).toBe("ended")
   })
 })
+
+describe("boss", () => {
+  const t = { waves: 10, rest: 12, hp: 0.1, speed: 0.02, runners: 3, sprinters: 4, brutes: 5 }
+
+  test("every fifth wave has a boss, more of them for a bigger team", () => {
+    expect(waveOf(4, 1, t, new Rng(1))).not.toContain("boss")
+    expect(waveOf(5, 1, t, new Rng(1)).filter((k) => k === "boss").length).toBe(1)
+    expect(waveOf(10, 4, t, new Rng(1)).filter((k) => k === "boss").length).toBe(2)
+    expect(ZOMBIES.boss.health).toBeGreaterThan(ZOMBIES.brute.health * 4)
+  })
+
+  test("its arrival is announced, and the snapshot carries every zombie's full health for the ring", () => {
+    const w = zWorld("zsv")
+    const m = mode(w)
+    run(w, ZOMBIE.first + 0.1)
+    m.queue = ["boss"]
+    run(w, 1.5)
+    expect(w.takeEvents().some((e) => e.k === "wave" && e.what === "boss")).toBe(true)
+    const boss = buildSnapshot(w, "a").players.find((p) => p.z === "boss")!
+    expect(boss.hm).toBe(boss.health)
+    expect(boss.hm).toBeGreaterThan(ZOMBIES.boss.health - 1)
+  })
+})

@@ -26,7 +26,7 @@ import { MELEE } from "../../shared/sim/melee"
 import { type Stamina, freshStamina, stepStamina } from "../../shared/sim/stamina"
 import { MODES } from "../../shared/sim/modes"
 import { INF_COLORS, ZOMBIE_COLORS, eyes, infected, zombieOf } from "./rules-fx"
-import { ZOMBIES, type ZombieKind } from "../../shared/sim/modes-zombie"
+import { ZOMBIES, type ZombieKind, heavy } from "../../shared/sim/modes-zombie"
 import { carries, slowCarrier } from "../../shared/sim/modes-objective"
 
 export type Rgb3 = [number, number, number]
@@ -92,8 +92,8 @@ export class Game {
   hitAt = -10
   killAt = -10
   banner: { text: string; t: number } | null = null
-  /** Called when a zombie wave starts or is cleared (the music's sting and resolve). */
-  onWave: ((what: "start" | "clear", n: number) => void) | null = null
+  /** Called when a zombie wave starts, its boss arrives or it is cleared (the music's stings and resolve). */
+  onWave: ((what: "start" | "clear" | "boss", n: number) => void) | null = null
   /** Crosshair spread from recent firing, 0..1. */
   bloom = 0
   hurt = 0
@@ -140,7 +140,7 @@ export class Game {
   private soundAt = new Map<string, number>()
   private models: PartModels
   /** The dead: walkers and runners share a body, brutes have their own. Guns and the rest are the soldier's. */
-  private zModels: { walker: PartModels; brute: PartModels }
+  private zModels: { walker: PartModels; brute: PartModels; boss: PartModels }
   private gear: { frag: number; claymore: number; led: number }
   private frame = new Float32Array(FRAME_FLOATS)
   private culler = new LightCuller()
@@ -174,11 +174,11 @@ export class Game {
       casing: regGuns(p.casing),
       hole: reg(p.hole),
     }
-    const dead = (brute: boolean): PartModels => {
-      const z = zombieModels(brute)
+    const dead = (kind: "walker" | "brute" | "boss"): PartModels => {
+      const z = zombieModels(kind)
       return { ...this.models, pelvis: reg(z.pelvis), torso: reg(z.torso), head: reg(z.head), upperArm: reg(z.upperArm), foreArm: reg(z.foreArm), thigh: reg(z.thigh), shin: reg(z.shin), foot: reg(z.foot) }
     }
-    this.zModels = { walker: dead(false), brute: dead(true) }
+    this.zModels = { walker: dead("walker"), brute: dead("brute"), boss: dead("boss") }
     const gm = gearModels()
     this.gear = { frag: reg(gm.frag), claymore: reg(gm.claymore), led: reg(gm.led) }
     this.map = getMap(1)
@@ -351,7 +351,7 @@ export class Game {
 
   /** Which body to draw: the soldier's, or one of the dead's by kind. */
   private bodyModels(zombie: string): PartModels {
-    return !zombie ? this.models : zombie === "brute" ? this.zModels.brute : this.zModels.walker
+    return !zombie ? this.models : zombie === "boss" ? this.zModels.boss : zombie === "brute" ? this.zModels.brute : this.zModels.walker
   }
 
   private place(b: Body): void {
@@ -418,7 +418,7 @@ export class Game {
         }
         // The horde would flood the feed: only brutes, and whoever the dead get, make it in.
         const z = zombieOf(this.snap, e.victim)
-        if (z && z !== "brute") {
+        if (z && !heavy(z)) {
           if (e.killer === this.myId) {
             this.killAt = t
             this.sound.hit(true)
@@ -479,13 +479,14 @@ export class Game {
         if (a) swing(a, t)
         if (a && me && Math.hypot(a.x - me.x, a.y - me.y) < 14) this.sound.swipe(a.x - me.x, a.y - me.y, false)
         const z = zombieOf(this.snap, e.by)
-        if (z && a && me && Math.random() < 0.5) this.sound.groan(a.x - me.x, a.y - me.y, z === "brute")
+        if (z && a && me && Math.random() < 0.5) this.sound.groan(a.x - me.x, a.y - me.y, heavy(z))
         return
       }
       case "wave":
-        this.banner = { text: e.what === "start" ? `WAVE ${e.n}` : `WAVE ${e.n} CLEARED`, t }
+        this.banner = { text: e.what === "start" ? `WAVE ${e.n}` : e.what === "boss" ? "THE BOSS IS HERE" : `WAVE ${e.n} CLEARED`, t }
         this.onWave?.(e.what, e.n)
-        this.sound.beep(0, 0)
+        if (e.what === "boss" && me) this.sound.groan(0, 6, true)
+        else this.sound.beep(0, 0)
         return
       case "end":
         return
@@ -944,13 +945,20 @@ export class Game {
       if (a.zombie) eyes(a, t, (...e) => this.sprite(...e), col)
       else if (infected(snap, this.roster, a.id)) eyes(a, t, (...e) => this.sprite(...e))
       const gc = glow(col, 0.9)
-      this.sprite(true, a.x, 0.03, a.y, 0.48, gc[0], gc[1], gc[2], 0.9, 2, 0, 0.14)
-      // Now and then a nearby zombie groans.
       const zk = zombieOf(snap, a.id)
+      if (zk) {
+        // The dead wear their health as the ring: a faint full circle, and a lit arc that shrinks toward the top as they're hurt.
+        const pv = snap?.players.find((p) => p.id === a.id)
+        const frac = pv?.hm ? Math.max(0, Math.min(1, pv.health / pv.hm)) : 1
+        const size = zk === "boss" ? 0.85 : zk === "brute" ? 0.62 : 0.48
+        this.sprite(true, a.x, 0.03, a.y, size, gc[0], gc[1], gc[2], 0.18, 2, 0, 0.14)
+        if (frac > 0) this.sprite(true, a.x, 0.032, a.y, size, gc[0], gc[1], gc[2], 0.95, 9, -Math.PI / 2, 0.14, Math.max(0.05, frac * Math.PI))
+      } else this.sprite(true, a.x, 0.03, a.y, 0.48, gc[0], gc[1], gc[2], 0.9, 2, 0, 0.14)
+      // Now and then a nearby zombie groans.
       if (zk && this.body && Math.random() < dt * 0.12) {
         const dx = a.x - this.body.x
         const dy = a.y - this.body.y
-        if (Math.hypot(dx, dy) < 16) this.sound.groan(dx, dy, zk === "brute")
+        if (Math.hypot(dx, dy) < 16) this.sound.groan(dx, dy, heavy(zk))
       }
     }
     const me = this.alive ? this.body : null

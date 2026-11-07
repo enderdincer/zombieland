@@ -3,11 +3,11 @@ import { randomCode } from "../shared/protocol"
 
 /**
  * What a Room tells the Lobby about itself. `players` counts held seats, so a room at MAX_PLAYERS is full. `mode` is
- * the current game mode; quick join ignores it: everyone votes on the next one anyway.
+ * the current game mode, which quick join matches when the player picked one.
  */
 export type RoomReport = { code: string; players: number; phase: string; private: boolean; mode?: string }
 export type RoomEntry = RoomReport & { updatedAt: number }
-type Reservation = { code: string; until: number; private: boolean; claims: number }
+type Reservation = { code: string; until: number; private: boolean; claims: number; mode?: string }
 
 /** Rooms heartbeat every 10 s; an entry older than this belongs to a room that died without saying so. */
 export const STALE_MS = 30_000
@@ -17,11 +17,14 @@ export const RESERVE_MS = 8_000
 /** Any room with people in it and a free seat, whatever its phase or mode, and whether or not it was made with Create game. */
 const open = (r: RoomEntry) => r.players > 0 && r.players < MAX_PLAYERS
 
-/** The room quick join sends you to: the one with the most players and a free seat; ties go to the latest report. */
-export function pickRoom(rooms: Iterable<RoomEntry>): RoomEntry | null {
+/**
+ * The room quick join sends you to: the one with the most players and a free seat, in `mode` when one is given; ties
+ * go to the latest report.
+ */
+export function pickRoom(rooms: Iterable<RoomEntry>, mode?: string): RoomEntry | null {
   let best: RoomEntry | null = null
   for (const r of rooms) {
-    if (!open(r)) continue
+    if (!open(r) || (mode && r.mode !== mode)) continue
     if (!best) best = r
     else if (r.players !== best.players) best = r.players > best.players ? r : best
     else if (r.updatedAt !== best.updatedAt) best = r.updatedAt > best.updatedAt ? r : best
@@ -50,17 +53,20 @@ export class Matchmaker {
     for (const [code, r] of this.reserved) if (now >= r.until) this.reserved.delete(code)
   }
 
-  /** A room code for quick join: the best open room, else a shared reservation for a brand-new public room. */
-  quick(now: number): string {
+  /**
+   * A room code for quick join: the best open room (playing `mode`, when given), else a shared reservation for a
+   * brand-new public room in that mode. The joiner's socket asks for the mode, which the first arrival sets.
+   */
+  quick(now: number, mode?: string): string {
     this.prune(now)
-    const room = pickRoom(this.rooms.values())
+    const room = pickRoom(this.rooms.values(), mode)
     if (room) return room.code
     for (const r of this.reserved.values())
-      if (!r.private && r.claims < MAX_PLAYERS) {
+      if (!r.private && r.claims < MAX_PLAYERS && r.mode === mode) {
         r.claims++
         return r.code
       }
-    return this.reserve(now, false)
+    return this.reserve(now, false, mode)
   }
 
   /** A fresh private room code. Quick join never hands it out. */
@@ -80,10 +86,10 @@ export class Matchmaker {
     return { players, games }
   }
 
-  private reserve(now: number, priv: boolean): string {
+  private reserve(now: number, priv: boolean, mode?: string): string {
     let code = randomCode(this.rand)
     for (let i = 0; i < 64 && (this.rooms.has(code) || this.reserved.has(code)); i++) code = randomCode(this.rand)
-    this.reserved.set(code, { code, until: now + RESERVE_MS, private: priv, claims: 1 })
+    this.reserved.set(code, { code, until: now + RESERVE_MS, private: priv, claims: 1, mode })
     return code
   }
 }
