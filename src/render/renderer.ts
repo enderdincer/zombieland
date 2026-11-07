@@ -3,6 +3,7 @@ import type { LevelData } from "./level-mesh"
 import { LIGHT_FLOATS, OCC_FLOATS } from "./lighting"
 import { VERT_BYTES, type Mesh } from "./mesh"
 import { FRAME_FLOATS, polarShader, postShader, sceneShader, spriteShader } from "./shaders"
+import type { RenderBackend } from "./backend"
 
 const SAMPLES = 4
 const HDR: GPUTextureFormat = "rgba16float"
@@ -38,6 +39,9 @@ export type FrameInput = {
   addCount: number
   /** time, desaturate, flash, exposure */
   grade: [number, number, number, number]
+  /** For the 2D canvas, which can't draw the meshes: everyone alive (plan position, aim, colour, zombie kind) and the bodies. */
+  actors?: { x: number; y: number; aim: number; color: readonly [number, number, number]; zombie: string; alive: boolean }[]
+  corpses?: { x: number; y: number; color: readonly [number, number, number] }[]
 }
 
 /**
@@ -46,7 +50,8 @@ export type FrameInput = {
  * instanced characters, glass and light haze, and sprites, all lit through that polar shadow map, (3) bloom, then a
  * tone-mapped composite with grade, vignette and grain.
  */
-export class Renderer {
+export class Renderer implements RenderBackend {
+  readonly kind = "webgpu"
   private frameBuf: GPUBuffer
   private lightBuf: GPUBuffer
   private occBuf: GPUBuffer

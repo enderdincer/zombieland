@@ -1,7 +1,7 @@
 # blackout
 
 - After every meaningful change, run `bun run check` then `bun run deploy` so the latest build is live at https://anoma.ly/labs/blackout/.
-- WebGPU only runs in secure contexts: test via the deployed URL, the opentunnel dev URL or `localhost`, never a bare LAN hostname.
+- Rendering (`src/render/backend.ts`): WebGPU (`renderer.ts`) where the browser has it, else WebGL2 (`gl/renderer-gl.ts`, a GLSL port of `shaders.ts`: keep the two in step; needs EXT_color_buffer_float), else a flat 2D canvas (`canvas2d.ts`, drawn from the MapDef and `FrameInput.actors` for browsers with no GPU access, such as Mullvad and Tor by default). `?render=webgl` or `?render=2d` forces one; `<html data-render>` says which ran. WebGPU and WebGL only run in secure contexts: test via the deployed URL, the opentunnel dev URL or `localhost`, never a bare LAN hostname.
 - `TUNNEL=1 bun run dev` runs Wrangler (rooms, :8788) and Vite (:5191); opentunnel route `blackout` exposes it at https://blackout.lwoyjcaeyxv6.opentunnel.xyz.
 - The game is a plain top-down shooter: everyone sees everyone, three guns (rifle, shotgun, sniper), health with regen, respawns, a new procedural office floor every match. No progression, no bots online (only the dev `?practice` mode has bots; `?practice&mode=dom` picks a mode).
 - Modes (`shared/sim/modes.ts`, placements from the map in `shared/sim/places.ts`): free for all, team deathmatch, domination, search and destroy. Create game and quick join use the mode picked on the landing page (`?mode=` on the first socket; quick join only matches rooms playing it, `Matchmaker.quick(now, mode)`); with no pick a room plays zombie survival (`DEFAULT_MODE`); the end screen votes on the next.

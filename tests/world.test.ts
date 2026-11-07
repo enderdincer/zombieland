@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { CLAYMORE, END_SECONDS, EQUIPS, FRAG, GUNS, HEALTH, MATCH_SECONDS, RESPAWN_SECONDS, SPRINT_TO_FIRE } from "../shared/config"
+import { CLAYMORE, END_SECONDS, EQUIPS, FRAG, GUNS, HEALTH, MATCH_SECONDS, RESPAWN_SECONDS, SPRINT_SPEED } from "../shared/config"
 import { type Rect, RectGrid, pushOut, rayRect } from "../shared/geom"
 import { generateOffice } from "../shared/maps/office"
 import { Builder } from "../shared/maps/builder"
@@ -85,23 +85,19 @@ describe("sprint", () => {
     expect(a.x - 12).toBeGreaterThan((b.x - 12) * 1.4)
   })
 
-  test("pulling the trigger cancels the sprint, and the first shot waits for the gun to come up", () => {
+  test("you shoot on the run: the trigger keeps the sprint and fires at once", () => {
     const w = world(["a"])
-    const a = place(w, "a", 12, 12)
+    const a = place(w, "a", 3, 12)
     a.cooldownUntil = 0
     run(w, 0.5, () => ({ mx: 1, sprint: true }))
     w.takeEvents()
-    const start = w.time
-    let first = -1
-    for (let i = 0; i < 20 && first < 0; i++) {
-      run(w, 1 / 30, () => ({ mx: 1, sprint: true, fire: true }))
-      if (w.takeEvents().some((e) => e.k === "shot")) first = w.time - start
-    }
-    expect(first).toBeGreaterThan(SPRINT_TO_FIRE - 0.04)
-    expect(first).toBeLessThan(SPRINT_TO_FIRE + 0.1)
+    run(w, 1 / 30, () => ({ mx: 1, sprint: true, fire: true }))
+    expect(w.takeEvents().some((e) => e.k === "shot")).toBe(true)
+    run(w, 0.3, () => ({ mx: 1, sprint: true, fire: true }))
+    expect(Math.hypot(a.vx, a.vy)).toBeCloseTo(SPRINT_SPEED, 0)
   })
 
-  test("a semi-automatic press during the delay still fires once the gun is up", () => {
+  test("a semi-automatic gun fires on the run too", () => {
     const w = world(["a"])
     w.pickGun("a", "sniper")
     w.spawn(w.players.get("a")!)

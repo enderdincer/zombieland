@@ -222,15 +222,29 @@ export class ZombieMode extends Mode {
   }
 
   /**
-   * Survivors start together at the low end (at the zone, holding the line) and get up next to someone still
-   * standing. Zombies spawn away from everyone (zombieSpot).
+   * Survivors start together in the middle of the floor, in the offices rather than up against the outer glass with
+   * the city below filling the view, and get up next to someone still standing. Zombies spawn away from everyone
+   * (zombieSpot).
    */
   override spawnAt(w: World, p: Player): Vec | null {
     if (p.npc) return this.zombieSpot(w)
-    if (this.holds) return this.near(w, this.zone(w))
     const standing = this.members(w, 0).filter((q) => q.alive && q !== p)
-    if (this.wave === 0 || !standing.length) return this.endSlot(w, p, 0)
+    if (this.holds || this.wave === 0 || !standing.length) return this.midSlot(w, p)
     return this.near(w, w.rng.pick(standing))
+  }
+
+  /** A spot around the middle of the floor (domination's B, the zone): the centre, then rings at 1.2 m and 2.4 m. */
+  private midSlot(w: World, p: Player): Vec {
+    const c = this.zone(w)
+    const nav = navFor(w.map)
+    const spots: Vec[] = [c]
+    for (const r of [1.2, 2.4])
+      for (let i = 0; i < 8; i++) {
+        const v = { x: c.x + Math.cos((i / 8) * Math.PI * 2 + r) * r, y: c.y + Math.sin((i / 8) * Math.PI * 2 + r) * r }
+        if (nav.walkable(v) && clearLine(c.x, c.y, v.x, v.y, w.solids)) spots.push(v)
+      }
+    const i = Math.max(0, this.members(w, 0).indexOf(p))
+    return spots[i % spots.length]!
   }
 
   /** The map spawn nearest to `at`. */

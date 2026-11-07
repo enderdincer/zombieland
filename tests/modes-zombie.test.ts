@@ -7,6 +7,7 @@ import { buildSnapshot, rosterOf } from "../shared/sim/view"
 import { World } from "../shared/sim/world"
 import { hostEnd } from "../shared/sim/host"
 import { place, run, testMap } from "./helpers"
+import { generateOffice } from "../shared/maps/office"
 
 function zWorld(mode: ModeId, names: string[] = ["a"]): World {
   const w = new World(11, testMap(), mode)
@@ -239,5 +240,19 @@ describe("boss", () => {
     const boss = buildSnapshot(w, "a").players.find((p) => p.z === "boss")!
     expect(boss.hm).toBe(boss.health)
     expect(boss.hm).toBeGreaterThan(ZOMBIES.boss.health - 1)
+  })
+})
+
+describe("starting spots", () => {
+  test("survivors start together in the middle of the floor, not at its edge", () => {
+    for (const seed of [3, 17, 4242]) {
+      const map = generateOffice(seed)
+      const w = new World(seed, map, "zsv")
+      for (const n of ["a", "b", "c"]) w.addHuman(n, n)
+      const mid = (w.mode as ZombieMode).zone(w)
+      for (const p of w.players.values()) expect(Math.hypot(p.x - mid.x, p.y - mid.y)).toBeLessThan(2.6)
+      const [a, b] = [w.players.get("a")!, w.players.get("b")!]
+      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(0.5)
+    }
   })
 })

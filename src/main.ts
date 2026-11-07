@@ -12,7 +12,7 @@ import { Input } from "./game/input"
 import { NetSession, REJOIN_KEY } from "./game/net"
 import { LocalSession, type Session } from "./game/session"
 import { Camera } from "./render/camera"
-import { Renderer } from "./render/renderer"
+import { createBackend } from "./render/backend"
 import { Hud } from "./ui/hud"
 import { Menus } from "./ui/menus"
 import { ModeHud } from "./ui/modes-hud"
@@ -24,17 +24,6 @@ const GUN_KEY = "blackout.gun"
 const EQUIP_KEY = "blackout.equip"
 const MUSIC_KEY = "blackout.music"
 
-async function gpu(canvas: HTMLCanvasElement): Promise<Renderer | string> {
-  if (!navigator.gpu) return "BLACKOUT needs WebGPU. Use a recent Chrome, Edge or Safari over https or localhost."
-  const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" })
-  if (!adapter) return "No WebGPU adapter is available on this device."
-  const device = await adapter.requestDevice()
-  device.addEventListener("uncapturederror", (e) => console.error(`[gpu] ${e.error.message}`))
-  const context = canvas.getContext("webgpu")!
-  const format = navigator.gpu.getPreferredCanvasFormat()
-  context.configure({ device, format, alphaMode: "opaque" })
-  return new Renderer(device, context, format)
-}
 
 /**
  * How tense the zombie music should be: low between waves, rising with the dead within reach and your health
@@ -63,15 +52,13 @@ function waveProgress(z: NonNullable<Snapshot["mode"]["zombies"]>): number | nul
 }
 
 async function main() {
-  const canvas = document.getElementById("view") as HTMLCanvasElement
   const menuEl = document.getElementById("menu")!
-  const renderer = await gpu(canvas)
-  if (typeof renderer === "string") {
-    menuEl.className = "full"
-    menuEl.innerHTML = `<div class="landing"><div class="logo">BLACKOUT</div><div class="notice">${renderer}</div></div>`
-    return
-  }
   const params = new URLSearchParams(location.search)
+  // WebGPU where the browser has it, else WebGL2 (Firefox), else a flat 2D canvas (Mullvad, Tor). ?render= forces one.
+  const force = params.get("render")
+  const { backend: renderer, canvas } = await createBackend(document.getElementById("view") as HTMLCanvasElement, force === "webgpu" || force === "webgl" || force === "2d" ? force : null)
+  document.documentElement.dataset.render = renderer.kind
+  if (renderer.kind !== "webgpu") console.info(`[render] ${renderer.kind === "webgl" ? "WebGL2" : "2D canvas"} (no WebGPU${renderer.kind === "2d" ? " or WebGL2" : ""})`)
   const roomParam = (params.get("room") ?? "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8) || null
   const storedGun = localStorage.getItem(GUN_KEY) as Gun | null
   let gun: Gun = storedGun && GUN_IDS.includes(storedGun) ? storedGun : "rifle"
