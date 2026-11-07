@@ -50,5 +50,5 @@ export function bareKit(over: Partial<Kit> = {}): Kit {
   return { id: "bare", label: "MELEE", gun: null, mag: 0, reload: false, auto: false, cooldown: 0, damage: 0, melee: true, equip: null, equipCount: 0, walk: SPEED, run: SPRINT_SPEED, regen: true, ...over }
 }
 
-/** Sprinting needs Shift and movement; with a gun, pulling the trigger cancels it (bare hands swing on the run). */
-export const kitSprints = (i: { mx: number; my: number; fire: boolean; sprint: boolean }, kit: Kit): boolean => i.sprint && (!i.fire || !kit.gun) && Math.hypot(i.mx, i.my) > 0.1
+/** Sprinting needs the sprint key and movement; you can shoot or swing while you run. */
+export const kitSprints = (i: { mx: number; my: number; fire: boolean; sprint: boolean }, _kit: Kit): boolean => i.sprint && Math.hypot(i.mx, i.my) > 0.1

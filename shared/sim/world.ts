@@ -1,4 +1,4 @@
-import { CLAYMORE, DT, END_SECONDS, EQUIP_LOCK, type Equip, FRAG, GUNS, GUN_IDS, type Gun, HEALTH, HIT_RADIUS, REGEN_DELAY, REGEN_RATE, RESPAWN_SECONDS, SPRINT_TO_FIRE, type Weapon } from "../config"
+import { CLAYMORE, DT, END_SECONDS, EQUIP_LOCK, type Equip, FRAG, GUNS, GUN_IDS, type Gun, HEALTH, HIT_RADIUS, REGEN_DELAY, REGEN_RATE, RESPAWN_SECONDS, type Weapon } from "../config"
 import { type Rect, angleDiff, clearLine, raycast } from "../geom"
 import { type MapDef, getMap } from "../maps"
 import { Rng } from "../rng"
@@ -348,7 +348,6 @@ export class World {
       // Only while there's stamina for it; walking refills it.
       const sprint = stepStamina(p.stamina, kitSprints(intent, kit), DT)
       stepBody(p, intent.mx, intent.my, sprint ? kit.run : kit.walk, this.solids, DT)
-      if (sprint && kit.gun) p.readyAt = this.time + SPRINT_TO_FIRE
       if (p.reloadUntil > 0 && this.time >= p.reloadUntil) {
         p.reloadUntil = 0
         p.mag = kit.mag

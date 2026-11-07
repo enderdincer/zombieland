@@ -1,4 +1,4 @@
-import { CLAYMORE, DT, EQUIP_LOCK, FRAG, GUNS, SPEED, SPRINT_SPEED, SPRINT_TO_FIRE, type Equip, type Gun, type Weapon } from "../../shared/config"
+import { CLAYMORE, DT, EQUIP_LOCK, FRAG, GUNS, SPEED, SPRINT_SPEED, type Equip, type Gun, type Weapon } from "../../shared/config"
 import { type Rect, raycast } from "../../shared/geom"
 import { type MapDef, getMap } from "../../shared/maps"
 import { type Grenade, type Obstacles, obstaclesOf, stepGrenade } from "../../shared/sim/gear"
@@ -635,7 +635,6 @@ export class Game {
       this.triggerHeld = fire
       return
     }
-    if (sprint) this.readyAt = t + SPRINT_TO_FIRE
     const gun = GUNS[this.gun]
     if (this.reloadUntil > 0 && t >= this.reloadUntil) {
       this.reloadUntil = 0
