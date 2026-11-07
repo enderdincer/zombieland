@@ -12,6 +12,7 @@ export class Sound {
   private comp: DynamicsCompressorNode | null = null
   private verb: ConvolverNode | null = null
   private noise: AudioBuffer | null = null
+  private music: GainNode | null = null
   muted = false
 
   start(): void {
@@ -63,6 +64,16 @@ export class Sound {
     hg.gain.value = 0.025
     hum.connect(lp).connect(hg).connect(this.master)
     hum.start()
+  }
+
+  /** The audio context and an input for the music, behind the master volume (so M mutes it too); null before start(). */
+  musicBus(): { ctx: AudioContext; out: AudioNode } | null {
+    if (!this.ctx || !this.master) return null
+    if (!this.music) {
+      this.music = this.ctx.createGain()
+      this.music.connect(this.master)
+    }
+    return { ctx: this.ctx, out: this.music }
   }
 
   setMuted(m: boolean): void {

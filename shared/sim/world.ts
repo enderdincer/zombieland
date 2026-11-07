@@ -104,7 +104,7 @@ export type SimEvent =
   | { k: "swing"; by: string }
   | { k: "obj"; what: string; team: number; by: string; x: number; y: number }
   /** The room host restarted the match, in the same mode or a new one (shared/sim/host.ts). */
-  | { k: "host"; what: "reset" | "mode"; mode: ModeId }
+  | { k: "host"; what: "reset" | "mode" | "end"; mode: ModeId }
   /** Zombie modes: wave `n` starts or is cleared. */
   | { k: "wave"; what: "start" | "clear"; n: number }
 
@@ -208,7 +208,10 @@ export class World {
   /** Picks a gun. It's yours on your next spawn, or right away while you're dead or haven't fired since spawning. */
   pickGun(id: string, gun: Gun): void {
     const p = this.players.get(id)
-    if (p) p.pick = gun
+    if (!p) return
+    p.pick = gun
+    // Some modes (the zombie ones) swap it in your hands on the spot.
+    if (p.alive && this.phase === "play" && p.gun !== gun) this.mode.swap(this, p)
   }
 
   /** Picks the equipment for your next life. */

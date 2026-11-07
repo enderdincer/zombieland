@@ -16,6 +16,8 @@ export type ClientMsg =
   /** Room host: restart the match in the current mode, or switch to another; a new floor unless newFloor is false. */
   | { type: "host"; action: "reset"; newFloor: boolean }
   | { type: "host"; action: "mode"; mode: ModeId; newFloor: boolean }
+  /** Room host: end the match now (the end screen and the vote). */
+  | { type: "host"; action: "end" }
   | { type: "ping"; t: number }
 
 export type ServerMsg =
@@ -95,6 +97,7 @@ export function decodeClient(raw: unknown): ClientMsg | null {
     case "host": {
       const newFloor = o.newFloor !== false
       if (o.action === "reset") return { type: "host", action: "reset", newFloor }
+      if (o.action === "end") return { type: "host", action: "end" }
       const mode = modeOf(o.mode)
       return o.action === "mode" && mode ? { type: "host", action: "mode", mode, newFloor } : null
     }

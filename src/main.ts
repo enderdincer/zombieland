@@ -3,7 +3,9 @@ import "@fontsource/ibm-plex-mono/400.css"
 import "@fontsource/ibm-plex-mono/500.css"
 import { EQUIP_IDS, type Equip, GUN_IDS, type Gun } from "../shared/config"
 import { cleanName } from "../shared/protocol"
+import type { Snapshot } from "../shared/sim/view"
 import { MODE_IDS, type ModeId, modeOf } from "../shared/sim/modes"
+import { Music } from "./audio/music"
 import { Sound } from "./audio/sound"
 import { Game } from "./game/game"
 import { Input } from "./game/input"
@@ -14,11 +16,13 @@ import { Renderer } from "./render/renderer"
 import { Hud } from "./ui/hud"
 import { Menus } from "./ui/menus"
 import { ModeHud } from "./ui/modes-hud"
+import { Pause } from "./ui/pause"
 
 const MAX_DPR = 1.5
 const NAME_KEY = "blackout.name"
 const GUN_KEY = "blackout.gun"
 const EQUIP_KEY = "blackout.equip"
+const MUSIC_KEY = "blackout.music"
 
 async function gpu(canvas: HTMLCanvasElement): Promise<Renderer | string> {
   if (!navigator.gpu) return "BLACKOUT needs WebGPU. Use a recent Chrome, Edge or Safari over https or localhost."
@@ -30,6 +34,32 @@ async function gpu(canvas: HTMLCanvasElement): Promise<Renderer | string> {
   const format = navigator.gpu.getPreferredCanvasFormat()
   context.configure({ device, format, alphaMode: "opaque" })
   return new Renderer(device, context, format)
+}
+
+/**
+ * How tense the zombie music should be: low between waves, rising with the dead within reach and your health
+ * running out, and on edge while you're down.
+ */
+function threat(g: Game): number {
+  const z = g.snap?.mode.zombies
+  if (!z) return 0
+  if (z.state === "break") return 0.12
+  if (!g.alive || !g.body) return 0.45
+  let near = 0
+  for (const a of g.avatars.values()) if (a.alive && a.zombie && Math.hypot(a.x - g.body.x, a.y - g.body.y) < 9) near += a.zombie === "brute" ? 2 : 1
+  return 0.3 + Math.min(0.5, near * 0.1) + (g.health < 50 ? 0.2 : 0)
+}
+
+/**
+ * How far through the current wave (0..1), for the music's swell: the share of its zombies gone, against the most
+ * seen left in it. Null between waves.
+ */
+let wavePeak = { n: -1, left: 1 }
+function waveProgress(z: NonNullable<Snapshot["mode"]["zombies"]>): number | null {
+  if (z.state !== "wave") return null
+  if (wavePeak.n !== z.wave) wavePeak = { n: z.wave, left: 1 }
+  wavePeak.left = Math.max(wavePeak.left, z.left)
+  return 1 - z.left / wavePeak.left
 }
 
 async function main() {
@@ -54,6 +84,8 @@ async function main() {
   const modeHud = new ModeHud(document.getElementById("hud")!)
   let session: Session | null = null
   let game: Game | null = null
+  let music: Music | null = null
+  let musicOn = localStorage.getItem(MUSIC_KEY) !== "off"
 
   const begin = (name: string, s: (name: string) => Session) => {
     const clean = cleanName(name)
@@ -61,6 +93,9 @@ async function main() {
     sound.start()
     session = s(clean)
     game = new Game(renderer, session, sound)
+    game.onWave = (what) => (what === "start" ? music?.sting() : music?.resolve())
+    const bus = sound.musicBus()
+    if (bus && !music) music = new Music(bus.ctx, bus.out)
     menus.hide()
     hud.show(true)
   }
@@ -68,10 +103,22 @@ async function main() {
     session?.close()
     session = null
     game = null
+    pause.toggle(false)
+    music?.update(false, 0)
     hud.show(false)
     history.replaceState(null, "", location.pathname)
     menus.landing(null, message)
   }
+  const pause = new Pause({
+    exit: () => fatal(""),
+    restart: () => session?.send({ type: "host", action: "reset", newFloor: true }),
+    end: () => session?.send({ type: "host", action: "end" }),
+    toggleSound: () => sound.setMuted(!sound.muted),
+    toggleMusic: () => {
+      musicOn = !musicOn
+      localStorage.setItem(MUSIC_KEY, musicOn ? "on" : "off")
+    },
+  })
   const base = location.pathname.replace(/[^/]*$/, "")
   const api = (path: string) => fetch(`${base}api/${path}`, { method: "POST" }).then((r) => r.json() as Promise<{ room: string }>)
   const enter = (name: string, room: string, priv = false, mode: ModeId | null = null) => {
@@ -95,6 +142,8 @@ async function main() {
     .then((s) => menus.stats(s.players, s.games))
     .catch(() => {})
   input.onKey = (code) => {
+    if (code === "Escape" && game) pause.toggle()
+    if (pause.open) return
     if (code === "KeyM") sound.setMuted(!sound.muted)
     // T keeps the scoreboard open (the host picks teams there) until pressed again.
     if (code === "KeyT") scores = !scores
@@ -143,7 +192,8 @@ async function main() {
     const w = innerWidth
     const h = innerHeight
     if (game && session) {
-      input.enabled = game.snap?.phase === "play"
+      // The Esc menu takes your hands off the controls; the match carries on.
+      input.enabled = game.snap?.phase === "play" && !pause.open
       game.update(dt, input, cam, w, h, now)
       const body = game.body ? game.drawn : null
       const alive = game.alive
@@ -162,6 +212,9 @@ async function main() {
       hud.update(game, cam, w, h, input.mouse, session.status())
       modeHud.update(game, cam, w, h)
       menus.update(game.snap, game.roster, session.myId, session.room, input.held("Tab") || scores, (id) => game!.colorOf(id))
+      const zv = game.snap?.mode.zombies
+      pause.update({ host: !!game.roster.find((r) => r.id === session!.myId)?.host, playing: game.snap?.phase === "play", room: session.room, sound: !sound.muted, music: musicOn, musicMode: !!zv })
+      music?.update(musicOn && !!zv && game.snap?.phase === "play", zv ? threat(game) : 0, zv ? waveProgress(zv) : null)
     }
     requestAnimationFrame(frame)
   }

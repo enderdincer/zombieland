@@ -40,8 +40,10 @@ export function rulesResult(s: Snapshot): string | null {
   const z = s.mode.zombies
   if (!z) return null
   const waves = `${z.survived} WAVE${z.survived === 1 ? "" : "S"}`
-  if (!z.waves) return `SURVIVED ${waves}`
-  return s.mode.winner === 0 ? `ALL ${z.waves} WAVES SURVIVED` : z.zone && z.zone.integrity <= 0 ? `THE LINE BROKE · ${waves} HELD` : `OVERRUN · ${waves} SURVIVED`
+  if (z.why === "won") return `ALL ${z.waves} WAVES SURVIVED`
+  if (z.why === "breach") return `THE LINE BROKE · ${waves} HELD`
+  if (z.why === "ended") return `MATCH ENDED · ${waves} SURVIVED`
+  return z.waves ? `OVERRUN · ${waves} SURVIVED` : `SURVIVED ${waves}`
 }
 
 /** What the mode asks of you, for the intro banner. */
