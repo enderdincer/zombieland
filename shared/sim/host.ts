@@ -55,6 +55,15 @@ function place(w: World, p: Player, team: number): void {
   p.team = team
 }
 
+/** The host ends the match now, from play: straight to the end screen and the vote. Same rate limit as restarts. */
+export function hostEnd(w: World, by: string): boolean {
+  if (by !== w.host || w.phase !== "play" || w.time - w.hostActAt < HOST_COOLDOWN) return false
+  w.hostActAt = w.time
+  w.endMatch()
+  w.events.push({ k: "host", what: "end", mode: w.mode.id })
+  return true
+}
+
 /** Seconds between host resets and mode switches, so spam can't thrash the room. */
 export const HOST_COOLDOWN = 3
 

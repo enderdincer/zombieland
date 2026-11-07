@@ -92,6 +92,8 @@ export class Game {
   hitAt = -10
   killAt = -10
   banner: { text: string; t: number } | null = null
+  /** Called when a zombie wave starts or is cleared (the music's sting and resolve). */
+  onWave: ((what: "start" | "clear", n: number) => void) | null = null
   /** Crosshair spread from recent firing, 0..1. */
   bloom = 0
   hurt = 0
@@ -310,9 +312,11 @@ export class Game {
       this.place({ x: mine.x, y: mine.y, vx: 0, vy: 0 })
       return
     }
-    // The mode re-armed you mid-life (a gun game kill, turning infected): swap at once, with the raise.
+    // The mode re-armed you mid-life (a gun game kill, turning infected, a swap): swap at once, with the raise, and
+    // whatever rounds the server says are in it.
     if (you && you.kit.id !== this.kit.id) {
       this.arm(you.kit)
+      this.mag = you.mag
       this.readyAt = this.now + 0.3
       this.avatarMe.raiseAt = this.now
     }
@@ -480,12 +484,13 @@ export class Game {
       }
       case "wave":
         this.banner = { text: e.what === "start" ? `WAVE ${e.n}` : `WAVE ${e.n} CLEARED`, t }
+        this.onWave?.(e.what, e.n)
         this.sound.beep(0, 0)
         return
       case "end":
         return
       case "host":
-        this.banner = { text: e.what === "reset" ? "HOST RESET THE MATCH" : `HOST SWITCHED TO ${MODES[e.mode].label.toUpperCase()}`, t }
+        this.banner = { text: e.what === "reset" ? "HOST RESET THE MATCH" : e.what === "end" ? "HOST ENDED THE MATCH" : `HOST SWITCHED TO ${MODES[e.mode].label.toUpperCase()}`, t }
         return
       case "obj": {
         const text = objectiveBanner(e, this.myId, teamOf(this.snap, this.roster, this.myId), (id) => this.nameOf(id))

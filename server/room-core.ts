@@ -2,7 +2,7 @@ import { MAX_PLAYERS, SNAPSHOT_HZ, TICK_HZ } from "../shared/config"
 import { BUILD } from "../shared/build.gen"
 import { type ClientMsg, decodeClient, encodeServer } from "../shared/protocol"
 import { seedOf } from "../shared/rng"
-import { hostRestart, moveTeam, shuffleTeams } from "../shared/sim/host"
+import { hostEnd, hostRestart, moveTeam, shuffleTeams } from "../shared/sim/host"
 import type { ModeId } from "../shared/sim/modes"
 import { buildSnapshot, rosterOf } from "../shared/sim/view"
 import { World } from "../shared/sim/world"
@@ -79,6 +79,7 @@ export class RoomCore {
     else if (msg.type === "vote") this.world.vote(id, msg.mode)
     else if (msg.type === "team") moveTeam(this.world, id, msg.id, msg.team)
     else if (msg.type === "shuffle") shuffleTeams(this.world, id)
+    else if (msg.type === "host" && msg.action === "end") hostEnd(this.world, id)
     else if (msg.type === "host") hostRestart(this.world, id, msg.action === "mode" ? msg.mode : this.world.mode.id, msg.newFloor)
   }
 

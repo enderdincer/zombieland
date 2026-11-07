@@ -156,6 +156,9 @@ export class Mode {
 
   killed(_w: World, _victim: Player, _killer: Player, _how?: Weapon): void {}
 
+  /** A living player picked another gun: modes that let you swap mid-life re-arm them here. By default it waits for the next life. */
+  swap(_w: World, _p: Player): void {}
+
   /** What a player fights with: by default the gun and equipment they picked. */
   loadout(_w: World, p: Player): Kit {
     return gunKit(p.pick, p.equipPick)

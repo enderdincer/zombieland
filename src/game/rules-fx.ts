@@ -9,10 +9,11 @@ export const INF_COLORS: [Rgb, Rgb] = [
   [0.35, 1.0, 0.12],
 ]
 
-/** Zombies by kind: a sickly green walker, a yellower runner, a blood-dark brute. */
+/** Zombies by kind: a sickly green walker, a yellower runner, a magenta sprinter, a blood-dark brute. */
 export const ZOMBIE_COLORS: Record<string, Rgb> = {
   walker: [0.35, 1.0, 0.12],
   runner: [0.85, 1.0, 0.1],
+  sprinter: [1.0, 0.25, 0.85],
   brute: [0.9, 0.12, 0.08],
 }
 

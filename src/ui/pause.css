@@ -1,0 +1,59 @@
+/* The Esc menu: a dimmed overlay over the running match. */
+#pause {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 4, 9, 0.62);
+  backdrop-filter: blur(2px);
+  z-index: 20;
+}
+
+#pause.on {
+  display: flex;
+}
+
+#pause .box {
+  width: min(360px, 90vw);
+  display: grid;
+  gap: 10px;
+  text-align: center;
+  zoom: var(--hud, 1);
+}
+
+#pause .sub {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+
+#pause .sub b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+#pause .pair {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+}
+
+#pause .ph {
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #ffc864;
+  text-align: left;
+}
+
+#pause button.armed {
+  border-color: #ff5040;
+  color: #ff5040;
+}
+
+#pause button.exit {
+  margin-top: 10px;
+}

@@ -488,6 +488,36 @@ tr.me td {
   color: var(--faint);
 }
 
+#equip {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+#equip em {
+  font-style: normal;
+  color: var(--faint);
+  font-size: 10px;
+}
+
+/* Zombie modes: the three guns, the one in hand lit. */
+#equip .swap {
+  flex-basis: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--faint);
+}
+
+#equip .swap .on {
+  color: var(--ink);
+}
+
+#equip .swap kbd {
+  margin-right: 4px;
+}
+
 #banner {
   position: absolute;
   top: 30%;

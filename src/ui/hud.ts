@@ -29,7 +29,7 @@ export class Hud {
       <div id="respawn"></div>
       <div id="xh"><i class="l"></i><i class="r"></i><i class="t"></i><i class="b"></i><div id="hm"><i></i><i></i><i></i><i></i></div></div>
       <div id="status"></div>
-      <div id="help">WASD move · MOUSE aim · CLICK shoot · SHIFT sprint · DOUBLE-TAP A MOVE KEY sprint · RIGHT CLICK / V knife · Q look · R reload · G equipment · F plant/defuse · 1 2 3 guns · 4 5 frag/claymore · TAB scores · T teams · M mute</div>`
+      <div id="help">WASD move · MOUSE aim · CLICK shoot · SHIFT sprint · DOUBLE-TAP A MOVE KEY sprint · RIGHT CLICK / V knife · Q look · R reload · G equipment · F plant/defuse · 1 2 3 guns · 4 5 frag/claymore · TAB scores · T teams · M mute · ESC menu</div>`
     for (const e of root.querySelectorAll<HTMLElement>("[id]")) this.el[e.id] = e
   }
 
@@ -70,7 +70,11 @@ export class Hud {
     const rb = el.rbar!.firstElementChild as HTMLElement
     rb.style.width = reloading ? `${(1 - (g.reloadUntil - t) / gun.reload) * 100}%` : "0%"
 
-    el.equip!.innerHTML = kit.equip ? `<span class="${g.equipLeft > 0 ? "" : "out"}">${equipLabel(g.equip)} ×${g.equipLeft}</span><kbd>G</kbd>` : kit.melee && kit.gun ? `<span>KNIFE</span><kbd>RMB</kbd>` : ""
+    // Zombie modes: equipment comes back over time, and 1 2 3 swap guns on the spot.
+    const refill = s.mode.zombies?.refill ?? 0
+    const swaps = s.mode.zombies && alive ? `<div class="swap">${GUN_IDS.map((id, i) => `<span class="${id === g.gun ? "on" : ""}"><kbd>${i + 1}</kbd>${GUNS[id].label.toUpperCase()}</span>`).join("")}</div>` : ""
+    el.equip!.innerHTML =
+      (kit.equip ? `<span class="${g.equipLeft > 0 ? "" : "out"}">${equipLabel(g.equip)} ×${g.equipLeft}${refill > 0 ? ` <em>+1 IN ${Math.ceil(refill)}</em>` : ""}</span><kbd>G</kbd>` : kit.melee && kit.gun ? `<span>KNIFE</span><kbd>RMB</kbd>` : "") + swaps
 
     const b = g.banner && t - g.banner.t < 2.2 ? g.banner : null
     el.banner!.textContent = b?.text ?? ""

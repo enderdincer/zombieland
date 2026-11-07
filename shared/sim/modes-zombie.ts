@@ -1,4 +1,4 @@
-import { DT, HEALTH } from "../config"
+import { DT, type Gun, HEALTH } from "../config"
 import { type Vec, angleDiff, clearLine } from "../geom"
 import { Rng } from "../rng"
 import { type Kit, bareKit, gunKit } from "./kit"
@@ -22,7 +22,7 @@ export const ZOMBIE_MODES: readonly ModeId[] = ["zsv", "zend", "zhold"]
 export const isZombieMode = (id: ModeId): boolean => ZOMBIE_MODES.includes(id)
 export const ZOMBIE_TEAMS = ["SURVIVORS", "ZOMBIES"] as const
 
-export type ZombieKind = "walker" | "runner" | "brute"
+export type ZombieKind = "walker" | "runner" | "sprinter" | "brute"
 
 /**
  * Per kind: health, walking speed (m/s; you walk 4.2 and sprint 6.3), the swipe (damage, wind-up, cooldown, reach),
@@ -31,6 +31,8 @@ export type ZombieKind = "walker" | "runner" | "brute"
 export const ZOMBIES: Record<ZombieKind, { label: string; health: number; walk: number; damage: number; windup: number; cooldown: number; range: number; score: number; gnaw: number }> = {
   walker: { label: "ZOMBIE", health: 100, walk: 1.7, damage: 25, windup: 0.35, cooldown: 1.1, range: 1.4, score: 10, gnaw: 0.5 },
   runner: { label: "RUNNER", health: 60, walk: 3.9, damage: 15, windup: 0.25, cooldown: 0.8, range: 1.3, score: 15, gnaw: 0.35 },
+  // Quicker than a runner and faster than you walk, so you sprint or you shoot; a couple of rifle hits drop it.
+  sprinter: { label: "SPRINTER", health: 35, walk: 4.6, damage: 12, windup: 0.2, cooldown: 0.6, range: 1.3, score: 20, gnaw: 0.3 },
   brute: { label: "BRUTE", health: 450, walk: 1.35, damage: 45, windup: 0.5, cooldown: 1.6, range: 1.8, score: 60, gnaw: 2 },
 }
 
@@ -38,7 +40,7 @@ export const ZOMBIES: Record<ZombieKind, { label: string; health: number; walk: 
  * The break before the first wave, seconds between spawns (from `spawnSlow` in wave one down to `spawnFast`), how far
  * from every survivor a zombie spawns, the most alive at once, the knife (V) against the dead, and the backstop clock.
  */
-export const ZOMBIE = { first: 10, spawnSlow: 1.1, spawnFast: 0.35, spawnMin: 11, maxAlive: 28, knife: 75, seconds: 3600 }
+export const ZOMBIE = { first: 10, spawnSlow: 1.1, spawnFast: 0.35, spawnMin: 11, maxAlive: 28, knife: 75, seconds: 3600, swap: 0.45, refill: 20, equipMax: 2 }
 
 /** How many can be up at once in wave `n` for `survivors`: a few at first, more as the waves climb. */
 export const aliveCap = (n: number, survivors: number) => Math.min(ZOMBIE.maxAlive, 4 + 2 * Math.max(1, survivors) + n)
@@ -46,11 +48,11 @@ export const aliveCap = (n: number, survivors: number) => Math.min(ZOMBIE.maxAli
 export const HOLD = { radius: 3.5, integrity: 100, repair: 15, respawn: 5 }
 
 /** Per mode: waves to win (0 for endless), the break between waves, and how fast the waves climb. */
-type Tuning = { waves: number; rest: number; hp: number; speed: number; runners: number; brutes: number }
+type Tuning = { waves: number; rest: number; hp: number; speed: number; runners: number; sprinters: number; brutes: number }
 const TUNING: Record<"zsv" | "zend" | "zhold", Tuning> = {
-  zsv: { waves: 10, rest: 12, hp: 0.1, speed: 0.02, runners: 3, brutes: 5 },
-  zend: { waves: 0, rest: 8, hp: 0.15, speed: 0.03, runners: 2, brutes: 4 },
-  zhold: { waves: 8, rest: 12, hp: 0.1, speed: 0.02, runners: 3, brutes: 5 },
+  zsv: { waves: 10, rest: 12, hp: 0.1, speed: 0.02, runners: 3, sprinters: 4, brutes: 5 },
+  zend: { waves: 0, rest: 8, hp: 0.15, speed: 0.03, runners: 2, sprinters: 3, brutes: 4 },
+  zhold: { waves: 8, rest: 12, hp: 0.1, speed: 0.02, runners: 3, sprinters: 4, brutes: 5 },
 }
 
 export type ZombieView = {
@@ -64,8 +66,11 @@ export type ZombieView = {
   left: number
   /** Hold the line: the zone and its integrity (0..1). */
   zone: { x: number; y: number; r: number; integrity: number; breached: boolean } | null
-  /** Once it's over: the last wave cleared. */
+  /** Once it's over: the last wave cleared, and how it ended. */
   survived: number
+  why: "" | "won" | "overrun" | "breach" | "ended"
+  /** Seconds until your equipment gets another charge; 0 when it's full. */
+  refill: number
 }
 
 /** The zombies in wave `n` for `survivors` players: walkers, runners from a few waves in, brutes later, a horde of them every fifth. */
@@ -73,10 +78,12 @@ export function waveOf(n: number, survivors: number, t: Tuning, rng: Rng): Zombi
   const s = Math.max(1, survivors)
   const total = Math.min(90, Math.round((3 + 2.5 * n) * (0.6 + 0.4 * s)))
   const runners = n >= t.runners ? Math.floor(total * Math.min(0.4, 0.08 * (n - t.runners + 1))) : 0
+  const sprinters = n >= t.sprinters ? Math.max(1, Math.floor(total * Math.min(0.2, 0.05 * (n - t.sprinters + 1)))) : 0
   const brutes = n >= t.brutes ? Math.floor((n - t.brutes) / 2) + 1 + (n % 5 === 0 ? Math.ceil(s / 2) : 0) : 0
   const out: ZombieKind[] = []
-  for (let i = 0; i < total - runners; i++) out.push("walker")
+  for (let i = 0; i < total - runners - sprinters; i++) out.push("walker")
   for (let i = 0; i < runners; i++) out.push("runner")
+  for (let i = 0; i < sprinters; i++) out.push("sprinter")
   for (let i = out.length - 1; i > 0; i--) {
     const j = rng.int(i + 1)
     ;[out[i], out[j]] = [out[j]!, out[i]!]
@@ -106,6 +113,11 @@ export class ZombieMode extends Mode {
   /** Hold the line's zone integrity, 0..HOLD.integrity. */
   integrity: number = HOLD.integrity
   lost = false
+  won = false
+  /** Each survivor's rounds left in the guns they're not holding, so a swap is no free reload. */
+  private mags = new Map<string, Partial<Record<Gun, number>>>()
+  /** When each survivor's equipment gets its next charge. */
+  private refillAt = new Map<string, number>()
 
   protected get tune(): Tuning {
     return TUNING[this.id as keyof typeof TUNING] ?? TUNING.zsv
@@ -132,6 +144,9 @@ export class ZombieMode extends Mode {
     this.queue = []
     this.integrity = HOLD.integrity
     this.lost = false
+    this.won = false
+    this.mags.clear()
+    this.refillAt.clear()
     for (const p of w.players.values()) {
       p.team = 0
       p.stats.score = 0
@@ -154,8 +169,50 @@ export class ZombieMode extends Mode {
       const walk = z.walk * Math.min(1.35, 1 + this.tune.speed * k) * (0.9 + 0.2 * w.rng.next())
       return bareKit({ id: `z-${kind}`, label: z.label, walk, run: walk, regen: false, health: Math.round(z.health * (1 + this.tune.hp * k)), swing: { damage: z.damage, windup: z.windup, cooldown: z.cooldown, range: z.range } })
     }
-    // Your pick of gun and equipment, and V swings a knife that hurts the dead badly.
+    // A new life: every gun starts full again.
+    this.mags.delete(p.id)
+    this.refillAt.delete(p.id)
+    return this.survivorKit(p)
+  }
+
+  /** Your pick of gun and equipment, and the knife, which hurts the dead badly. */
+  private survivorKit(p: Player): Kit {
     return gunKit(p.pick, p.equipPick, { melee: true, swing: { damage: ZOMBIE.knife, windup: MELEE.windup, cooldown: MELEE.cooldown, range: MELEE.range } })
+  }
+
+  /**
+   * Swapping guns mid-life: the new one comes up after a moment, with whatever was left in it (full the first time).
+   * A reload in progress is lost. Your equipment stays as it is.
+   */
+  override swap(w: World, p: Player): void {
+    if (p.npc) return
+    const mags = this.mags.get(p.id) ?? {}
+    mags[p.gun] = p.mag
+    this.mags.set(p.id, mags)
+    const equip = p.equip
+    const left = p.equipLeft
+    const kit = this.survivorKit(p)
+    w.arm(p, kit)
+    p.mag = mags[kit.gun!] ?? kit.mag
+    p.equip = equip
+    p.equipLeft = left
+    p.readyAt = w.time + ZOMBIE.swap
+  }
+
+  /** Survivors short of equipment get a charge back every ZOMBIE.refill seconds, up to ZOMBIE.equipMax. */
+  private refill(w: World): void {
+    for (const p of this.members(w, 0)) {
+      if (!p.alive || p.equipLeft >= ZOMBIE.equipMax) {
+        this.refillAt.delete(p.id)
+        continue
+      }
+      const at = this.refillAt.get(p.id)
+      if (at === undefined) this.refillAt.set(p.id, w.time + ZOMBIE.refill)
+      else if (w.time >= at) {
+        p.equipLeft++
+        this.refillAt.set(p.id, w.time + ZOMBIE.refill)
+      }
+    }
   }
 
   /**
@@ -231,7 +288,7 @@ export class ZombieMode extends Mode {
       if (!p.alive) w.spawn(p)
       else {
         p.health = HEALTH
-        p.equipLeft = p.kit.equip ? p.kit.equipCount : 0
+        p.equipLeft = Math.max(p.equipLeft, p.kit.equip ? p.kit.equipCount : 0)
       }
     }
   }
@@ -242,6 +299,7 @@ export class ZombieMode extends Mode {
 
   override step(w: World): void {
     const survivors = this.members(w, 0)
+    this.refill(w)
     if (this.state === "break") {
       if (w.time >= this.nextAt) {
         this.wave++
@@ -268,7 +326,10 @@ export class ZombieMode extends Mode {
       }
       if (!this.queue.length && !alive.length) {
         w.events.push({ k: "wave", what: "clear", n: this.wave })
-        if (this.tune.waves && this.wave >= this.tune.waves) return w.endMatch()
+        if (this.tune.waves && this.wave >= this.tune.waves) {
+          this.won = true
+          return w.endMatch()
+        }
         this.state = "break"
         this.nextAt = w.time + this.tune.rest
         if (this.holds) this.integrity = Math.min(HOLD.integrity, this.integrity + HOLD.repair)
@@ -290,7 +351,7 @@ export class ZombieMode extends Mode {
 
   override result(w: World): { winner: string; team: number } {
     const ranked = this.members(w, 0).sort((a, b) => stat(b, "score") - stat(a, "score") || b.kills - a.kills)
-    return { winner: ranked[0]?.id ?? "", team: this.lost || !this.tune.waves ? 1 : 0 }
+    return { winner: ranked[0]?.id ?? "", team: this.won ? 0 : 1 }
   }
 
   override left(w: World): number {
@@ -317,6 +378,8 @@ export class ZombieMode extends Mode {
       left: this.queue.length + this.zombies(w).length,
       zone: this.holds ? { x: z.x, y: z.y, r: HOLD.radius, integrity: this.integrity / HOLD.integrity, breached } : null,
       survived: Math.max(0, this.survived),
+      why: w.phase !== "end" ? "" : this.won ? "won" : this.lost ? (this.holds ? "breach" : "overrun") : "ended",
+      refill: Math.max(0, (this.refillAt.get(viewer) ?? w.time) - w.time),
     }
     return { ...super.view(w, viewer), zombies }
   }

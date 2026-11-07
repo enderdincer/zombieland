@@ -5,6 +5,7 @@ import { HOLD, type HoldTheLine, ZOMBIE, ZOMBIES, type ZombieMode, waveOf } from
 import { Rng } from "../shared/rng"
 import { buildSnapshot, rosterOf } from "../shared/sim/view"
 import { World } from "../shared/sim/world"
+import { hostEnd } from "../shared/sim/host"
 import { place, run, testMap } from "./helpers"
 
 function zWorld(mode: ModeId, names: string[] = ["a"]): World {
@@ -154,5 +155,66 @@ describe("hold the line", () => {
     expect(w.phase).toBe("play")
     run(w, HOLD.respawn + 0.2)
     expect(a.alive).toBe(true)
+  })
+})
+
+describe("zombie extras", () => {
+  const t = { waves: 10, rest: 12, hp: 0.1, speed: 0.02, runners: 3, sprinters: 4, brutes: 5 }
+
+  test("sprinters join from wave four: faster than a runner, frailer", () => {
+    expect(waveOf(3, 2, t, new Rng(1))).not.toContain("sprinter")
+    expect(waveOf(4, 2, t, new Rng(1))).toContain("sprinter")
+    expect(ZOMBIES.sprinter.walk).toBeGreaterThan(ZOMBIES.runner.walk)
+    expect(ZOMBIES.sprinter.health).toBeLessThan(ZOMBIES.runner.health)
+  })
+
+  test("1 2 3 swap guns mid-life, and each gun keeps its rounds", () => {
+    const w = zWorld("zsv")
+    const a = w.players.get("a")!
+    a.mag = 12
+    w.pickGun("a", "shotgun")
+    expect(a.gun).toBe("shotgun")
+    expect(a.mag).toBe(6)
+    expect(a.readyAt).toBeGreaterThan(w.time)
+    a.mag = 2
+    w.pickGun("a", "rifle")
+    expect(a.gun).toBe("rifle")
+    expect(a.mag).toBe(12)
+    w.pickGun("a", "shotgun")
+    expect(a.mag).toBe(2)
+  })
+
+  test("other modes still wait for the next life", () => {
+    const w = new World(11, testMap(), "ffa")
+    w.addHuman("a", "a")
+    w.pickGun("a", "sniper")
+    expect(w.players.get("a")!.gun).toBe("rifle")
+  })
+
+  test("equipment comes back over time, up to two", () => {
+    const w = zWorld("zsv")
+    const a = w.players.get("a")!
+    a.equipLeft = 0
+    // Nobody's shooting the waves here: keep the survivor standing.
+    const wait = (s: number) => {
+      for (let i = 0; i < Math.round(s / DT); i++) {
+        a.health = 100
+        w.step()
+      }
+    }
+    wait(ZOMBIE.refill + 0.2)
+    expect(a.equipLeft).toBe(1)
+    wait(ZOMBIE.refill * 2 + 0.2)
+    expect(a.equipLeft).toBe(ZOMBIE.equipMax)
+    expect(buildSnapshot(w, "a").mode.zombies?.refill).toBe(0)
+  })
+
+  test("the host can end the match; it doesn't count as a win", () => {
+    const w = zWorld("zsv", ["a", "b"])
+    expect(hostEnd(w, "b")).toBe(false)
+    expect(hostEnd(w, "a")).toBe(true)
+    expect(w.phase).toBe("end")
+    expect(w.mode.result(w).team).toBe(1)
+    expect(buildSnapshot(w, "a").mode.zombies?.why).toBe("ended")
   })
 })
