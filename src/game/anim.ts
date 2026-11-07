@@ -646,7 +646,7 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   let torso = yawFrame(waist, torsoYaw)
   // Pitch and roll by the lean measured along the aim (the torso is bladed, so convert).
   const tb = torsoYaw - a.aim
-  const fwd = (a.bare ? 0.2 : 0) + (a.zombie ? (a.zombie === "brute" ? 0.32 : 0.28) + Math.sin(t * 1.3 + a.seed) * 0.04 : 0) + 0.1 + 0.08 * moving + 0.2 * sprint + leanFwd * 2.2 - a.torsoKick.x + breath * 0.012 * still + reloadHunch + raise * 0.1
+  const fwd = (a.bare ? 0.2 : 0) + (a.zombie ? (a.zombie === "brute" || a.zombie === "boss" ? 0.32 : 0.28) + Math.sin(t * 1.3 + a.seed) * 0.04 : 0) + 0.1 + 0.08 * moving + 0.2 * sprint + leanFwd * 2.2 - a.torsoKick.x + breath * 0.012 * still + reloadHunch + raise * 0.1
   const side = leanSide * 2.2 + Math.sin(2 * th) * 0.02 * moving
   torso = pitch(torso, -(fwd * Math.cos(tb) + side * Math.sin(tb)))
   torso = roll(torso, side * Math.cos(tb) - fwd * Math.sin(tb) * 0.4)
@@ -706,7 +706,7 @@ function build(a: Avatar, now: number, k: number, clip: Clip | null, ct: number)
   if (a.zombie) {
     // Arms out ahead and drifting, never quite together; the brute's hang low and swing with its stride. A swipe
     // rakes the right hand across, the brute's comes down overhead.
-    const brute = a.zombie === "brute"
+    const brute = a.zombie === "brute" || a.zombie === "boss"
     const bl = Math.sin(t * 2.1 + a.seed) * 0.05
     const br = Math.sin(t * 1.7 + a.seed * 1.3) * 0.05
     if (brute) {

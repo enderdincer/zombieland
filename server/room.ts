@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers"
-import { type ModeId, modeOf } from "../shared/sim/modes"
+import { DEFAULT_MODE, type ModeId, modeOf } from "../shared/sim/modes"
 import { type Env, lobbyOf } from "./env"
 import { type Conn, MAX_CATCHUP, RoomCore, TICK_MS } from "./room-core"
 
@@ -25,7 +25,7 @@ export class Room extends DurableObject<Env> {
     if (req.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("expected websocket", { status: 426 })
     const code = req.headers.get("x-room")
     if (!code) return new Response("missing room", { status: 400 })
-    this.mode ??= modeOf(await this.ctx.storage.get<string>("mode")) ?? "ffa"
+    this.mode ??= modeOf(await this.ctx.storage.get<string>("mode")) ?? DEFAULT_MODE
     const core = (this.core ??= new RoomCore(code, this.mode))
     this.priv ??= (await this.ctx.storage.get<boolean>("private")) ?? false
     // Likewise only the first arrival picks the mode (Create game sends it).

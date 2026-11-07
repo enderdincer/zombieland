@@ -3,7 +3,7 @@ import { BUILD } from "../shared/build.gen"
 import { type ClientMsg, decodeClient, encodeServer } from "../shared/protocol"
 import { seedOf } from "../shared/rng"
 import { hostEnd, hostRestart, moveTeam, shuffleTeams } from "../shared/sim/host"
-import type { ModeId } from "../shared/sim/modes"
+import { DEFAULT_MODE, type ModeId } from "../shared/sim/modes"
 import { buildSnapshot, rosterOf } from "../shared/sim/view"
 import { World } from "../shared/sim/world"
 
@@ -38,7 +38,7 @@ export class RoomCore {
 
   constructor(
     readonly code: string,
-    mode: ModeId = "ffa",
+    mode: ModeId = DEFAULT_MODE,
     private clock: () => number = Date.now,
   ) {
     this.world = new World(seedOf(code), null, mode)

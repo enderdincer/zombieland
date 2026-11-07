@@ -106,7 +106,7 @@ export type SimEvent =
   /** The room host restarted the match, in the same mode or a new one (shared/sim/host.ts). */
   | { k: "host"; what: "reset" | "mode" | "end"; mode: ModeId }
   /** Zombie modes: wave `n` starts or is cleared. */
-  | { k: "wave"; what: "start" | "clear"; n: number }
+  | { k: "wave"; what: "start" | "clear" | "boss"; n: number }
 
 const BOT_NAMES = ["kade", "rei", "mako", "juno", "lexx", "ryn", "zen", "lee", "nox", "ivo", "sable", "wren"]
 

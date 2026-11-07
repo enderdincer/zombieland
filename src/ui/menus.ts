@@ -1,5 +1,5 @@
 import { floorOf } from "../../shared/maps"
-import { MODES, MODE_IDS, type ModeId, TEAM_NAMES, modeOf } from "../../shared/sim/modes"
+import { DEFAULT_MODE, MODES, MODE_IDS, type ModeId, TEAM_NAMES, modeOf } from "../../shared/sim/modes"
 import { hostPicks } from "../../shared/sim/host"
 import type { RosterRow, Snapshot } from "../../shared/sim/view"
 import "./teams.css"
@@ -10,7 +10,8 @@ import { boardStat, rulesColumns, rulesResult, rulesTeam, rulesWinner } from "./
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 export type MenuActions = {
-  quick(name: string): void
+  /** The fullest public room in `mode` with a seat, else a new one in it. */
+  quick(name: string, mode: ModeId): void
   /** A private room whose first match is `mode`. */
   create(name: string, mode: ModeId): void
   join(name: string, room: string): void
@@ -32,8 +33,8 @@ const MODE_KEY = "blackout.mode"
 export class Menus {
   private key = ""
   private busy = false
-  /** The mode Create game will use. */
-  private mode: ModeId = modeOf(localStorage.getItem(MODE_KEY)) ?? "tdm"
+  /** The mode Create game and quick join use. */
+  private mode: ModeId = modeOf(localStorage.getItem(MODE_KEY)) ?? DEFAULT_MODE
   /** Host controls: the restart waiting on its confirming click ("reset" or a mode), and whether it's a new floor. */
   private armed: { what: string; at: number } | null = null
   private newFloor = true
@@ -77,7 +78,7 @@ export class Menus {
     if (act === "mode" && m) return this.pickMode(m)
     if (this.busy) return
     const name = this.root.querySelector<HTMLInputElement>("#name")?.value ?? this.name
-    if (act === "quick") this.a.quick(name)
+    if (act === "quick") this.a.quick(name, this.mode)
     else if (act === "create") this.a.create(name, this.mode)
     else if (act === "join") {
       const fixed = this.root.querySelector<HTMLElement>("[data-room]")?.dataset.room
@@ -105,6 +106,8 @@ export class Menus {
     this.mode = m
     localStorage.setItem(MODE_KEY, m)
     for (const b of this.root.querySelectorAll<HTMLElement>(".modepick [data-mode]")) b.classList.toggle("on", b.dataset.mode === m)
+    const qm = this.root.querySelector(".qm")
+    if (qm) qm.textContent = MODES[m].label.toUpperCase()
     this.blurb(m)
   }
 
@@ -118,7 +121,7 @@ export class Menus {
     return `<b>${esc(MODES[m].label.toUpperCase())}</b>${esc(MODES[m].blurb)}`
   }
 
-  /** The mode chips under Create game: a compact grid of short names, the hovered or picked mode's blurb below. */
+  /** The mode chips above Quick join and Create game: a compact grid of short names, the hovered or picked mode's blurb below. */
   private modePicker(): string {
     return `<div class="modepick">${MODE_IDS.map((m) => `<button class="${m === this.mode ? "on" : ""}" data-act="mode" data-mode="${m}" title="${esc(MODES[m].label)}">${esc(MODES[m].short)}</button>`).join("")}</div>
       <div class="modeblurb">${this.blurbHtml(this.mode)}</div>`
@@ -137,9 +140,9 @@ export class Menus {
       ${
         room
           ? `<div class="room" data-room="${esc(room)}">ROOM <b>${esc(room.toUpperCase())}</b></div><button class="primary" data-act="join" data-primary>JOIN GAME</button>`
-          : `<button class="primary" data-act="quick" data-primary>QUICK JOIN</button>
+          : `${this.modePicker()}
+             <button class="primary" data-act="quick" data-primary>QUICK JOIN · <span class="qm">${esc(MODES[this.mode].label.toUpperCase())}</span></button>
              <button data-act="create">CREATE GAME</button>
-             ${this.modePicker()}
              <div class="row"><input id="code" maxlength="8" placeholder="room code" autocapitalize="off" /><button data-act="join">JOIN</button></div>`
       }
       <div class="stats" id="stats"></div>

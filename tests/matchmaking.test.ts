@@ -51,6 +51,19 @@ describe("Matchmaker", () => {
     expect(mm.reserved.has(code)).toBe(true)
   })
 
+  test("quick join with a mode only joins rooms playing it, and reserves per mode", () => {
+    const mm = new Matchmaker()
+    mm.report({ code: "FFAA", players: 6, phase: "play", private: false, mode: "ffa" }, 0)
+    mm.report({ code: "ZOMB", players: 2, phase: "play", private: false, mode: "zsv" }, 0)
+    expect(mm.quick(10, "zsv")).toBe("ZOMB")
+    expect(mm.quick(10, "ffa")).toBe("FFAA")
+    expect(mm.quick(10)).toBe("FFAA")
+    const hold = mm.quick(20, "zhold")
+    expect(["FFAA", "ZOMB"]).not.toContain(hold)
+    expect(mm.quick(30, "zhold")).toBe(hold)
+    expect(mm.quick(30, "zend")).not.toBe(hold)
+  })
+
   test("concurrent quick joins share the reserved code, until it expires", () => {
     const mm = new Matchmaker()
     const a = mm.quick(0)

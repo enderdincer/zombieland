@@ -9,11 +9,12 @@ export const INF_COLORS: [Rgb, Rgb] = [
   [0.35, 1.0, 0.12],
 ]
 
-/** Zombies by kind: a sickly green walker, a yellower runner, a magenta sprinter, a blood-dark brute. */
+/** Zombies by kind: a sickly green walker, a yellower runner, a magenta sprinter, a blood-dark brute, a violet boss. */
 export const ZOMBIE_COLORS: Record<string, Rgb> = {
   walker: [0.35, 1.0, 0.12],
   runner: [0.85, 1.0, 0.1],
   sprinter: [1.0, 0.25, 0.85],
+  boss: [0.6, 0.2, 1.0],
   brute: [0.9, 0.12, 0.08],
 }
 
@@ -30,7 +31,7 @@ export function eyes(a: Avatar, t: number, sprite: Sprite, color?: Rgb): void {
   const h = a.body?.head
   if (!h) return
   const k = 0.85 + 0.15 * Math.sin(t * 9 + a.seed)
-  const [fwd, up, gap] = a.zombie ? (a.zombie === "brute" ? [0.12, 0.18, 0.05] : [0.105, 0.155, 0.043]) : [0.17, 0.165, 0.05]
+  const [fwd, up, gap] = a.zombie ? (a.zombie === "boss" ? [0.14, 0.2, 0.06] : a.zombie === "brute" ? [0.12, 0.18, 0.05] : [0.105, 0.155, 0.043]) : [0.17, 0.165, 0.05]
   const c = color ? [color[0] * 3, color[1] * 3, color[2] * 3] : [1.6, 3, 0.3]
   for (const side of [-1, 1]) {
     const p = at(h, fwd, up, side * gap)

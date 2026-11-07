@@ -3,9 +3,9 @@ import type { ClientMsg } from "../../shared/protocol"
 import { type RosterRow, type Snapshot, buildSnapshot, rosterOf } from "../../shared/sim/view"
 import type { Equip, Gun } from "../../shared/config"
 import { hostEnd, hostRestart, moveTeam, shuffleTeams } from "../../shared/sim/host"
-import { MODES, type ModeId } from "../../shared/sim/modes"
+import { DEFAULT_MODE, MODES, type ModeId } from "../../shared/sim/modes"
 import { type SimEvent, World } from "../../shared/sim/world"
-import { isZombieMode } from "../../shared/sim/modes-zombie"
+import { ZombieMode, isZombieMode } from "../../shared/sim/modes-zombie"
 
 /** What the game loop needs from a match, whether it runs in this tab or in a room on the server. */
 export interface Session {
@@ -36,11 +36,13 @@ export class LocalSession implements Session {
   private events: SimEvent[] = []
   private every = Math.max(1, Math.round(TICK_HZ / SNAPSHOT_HZ))
 
-  constructor(name: string, gun: Gun, equip: Equip, mode: ModeId = "ffa") {
+  /** `wave`: zombie modes only, start at that wave (dev, to try the boss without playing four waves). */
+  constructor(name: string, gun: Gun, equip: Equip, mode: ModeId = DEFAULT_MODE, wave = 0) {
     this.world = new World((Math.random() * 2 ** 31) | 0, null, mode)
     // Local practice (dev only, ?practice) is the one place with bots: 3 on 3 in team modes.
     this.world.botFill = practiceBots(mode)
     this.world.addHuman(this.myId, name, gun, equip)
+    if (wave > 1 && this.world.mode instanceof ZombieMode) this.world.mode.wave = wave - 1
     this.publish()
   }
 

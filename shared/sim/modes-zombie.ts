@@ -22,7 +22,7 @@ export const ZOMBIE_MODES: readonly ModeId[] = ["zsv", "zend", "zhold"]
 export const isZombieMode = (id: ModeId): boolean => ZOMBIE_MODES.includes(id)
 export const ZOMBIE_TEAMS = ["SURVIVORS", "ZOMBIES"] as const
 
-export type ZombieKind = "walker" | "runner" | "sprinter" | "brute"
+export type ZombieKind = "walker" | "runner" | "sprinter" | "brute" | "boss"
 
 /**
  * Per kind: health, walking speed (m/s; you walk 4.2 and sprint 6.3), the swipe (damage, wind-up, cooldown, reach),
@@ -33,6 +33,8 @@ export const ZOMBIES: Record<ZombieKind, { label: string; health: number; walk: 
   runner: { label: "RUNNER", health: 60, walk: 3.9, damage: 15, windup: 0.25, cooldown: 0.8, range: 1.3, score: 15, gnaw: 0.35 },
   // Quicker than a runner and faster than you walk, so you sprint or you shoot; a couple of rifle hits drop it.
   sprinter: { label: "SPRINTER", health: 35, walk: 4.6, damage: 12, windup: 0.2, cooldown: 0.6, range: 1.3, score: 20, gnaw: 0.3 },
+  // Every fifth wave ends with a boss: a hulk that soaks up a whole team's fire, with a long, crushing reach.
+  boss: { label: "BOSS", health: 2400, walk: 1.5, damage: 70, windup: 0.6, cooldown: 1.8, range: 2.2, score: 300, gnaw: 6 },
   brute: { label: "BRUTE", health: 450, walk: 1.35, damage: 45, windup: 0.5, cooldown: 1.6, range: 1.8, score: 60, gnaw: 2 },
 }
 
@@ -90,6 +92,8 @@ export function waveOf(n: number, survivors: number, t: Tuning, rng: Rng): Zombi
   }
   // Brutes come late in the wave, spread through its second half.
   for (let i = 0; i < brutes; i++) out.splice(Math.floor(out.length * (0.5 + 0.5 * rng.next())), 0, "brute")
+  // Boss waves: one boss (two from four survivors, three from seven) three quarters of the way through.
+  if (n % 5 === 0) for (let i = 0; i < 1 + Math.floor((s - 1) / 3); i++) out.splice(Math.floor(out.length * 0.75), 0, "boss")
   return out
 }
 
@@ -97,6 +101,8 @@ const stat = (p: Player, k: string) => p.stats[k] ?? 0
 const add = (p: Player, k: string, n: number) => {
   p.stats[k] = stat(p, k) + n
 }
+/** The big ones: brutes and bosses hang their arms low, smash overhead and groan deep. */
+export const heavy = (kind: string): boolean => kind === "brute" || kind === "boss"
 export const kindOf = (p: Player): ZombieKind | null => (p.npc in ZOMBIES ? (p.npc as ZombieKind) : null)
 
 export class ZombieMode extends Mode {
@@ -269,6 +275,7 @@ export class ZombieMode extends Mode {
     z.name = ZOMBIES[kind].label
     z.team = 1
     w.spawn(z)
+    if (kind === "boss") w.events.push({ k: "wave", what: "boss", n: this.wave })
   }
 
   override killed(w: World, victim: Player, killer: Player): void {

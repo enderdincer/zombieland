@@ -22,8 +22,8 @@ export class Lobby extends DurableObject<Env> {
     await this.ctx.storage.put("rooms", [...this.mm.rooms.values()])
   }
 
-  quick() {
-    return this.mm.quick(Date.now())
+  quick(mode?: string) {
+    return this.mm.quick(Date.now(), mode)
   }
 
   create() {
