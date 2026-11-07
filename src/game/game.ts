@@ -14,7 +14,8 @@ import { HOLD, MUZZLE, SHOULDER, personModels } from "../render/person"
 import { zombieModels } from "../render/zombie"
 import { type Avatar, EV, type PartModels, type PushPart, animate, fire as shoot, glow, gunPoints, hit, newAvatar, pose, swing, useGear } from "./anim"
 import { type Corpse, type DeathStyle, type Debris, deathStyle, emitRagdoll, ragdoll, ragdollCentre, stepDebris, stepRagdoll } from "./ragdoll"
-import { type Batch, type FrameInput, INST_FLOATS, type Renderer, SPRITE_FLOATS } from "../render/renderer"
+import { type Batch, type FrameInput, INST_FLOATS, SPRITE_FLOATS } from "../render/renderer"
+import type { RenderBackend } from "../render/backend"
 import { FRAME_FLOATS } from "../render/shaders"
 import type { Input } from "./input"
 import type { Session } from "./session"
@@ -151,12 +152,12 @@ export class Game {
   private nAlpha = 0
 
   constructor(
-    private renderer: Renderer,
+    private renderer: RenderBackend,
     private session: Session,
     private sound: Sound,
   ) {
     const p = personModels()
-    const reg = (m: Parameters<Renderer["addModel"]>[0]) => renderer.addModel(m)
+    const reg = (m: Parameters<RenderBackend["addModel"]>[0]) => renderer.addModel(m)
     const regGuns = (r: typeof p.gun) => ({ rifle: reg(r.rifle), shotgun: reg(r.shotgun), sniper: reg(r.sniper) })
     this.models = {
       pelvis: reg(p.pelvis),
@@ -190,7 +191,7 @@ export class Game {
     this.blockers = [...map.walls.map((w) => w.rect), ...map.windows, ...map.glass]
     this.solids = [...this.blockers, ...map.props.filter((p) => p.solid).map((p) => p.rect)]
     this.obstacles = obstaclesOf(map)
-    this.renderer.setLevel(buildLevel(map))
+    this.renderer.setLevel(buildLevel(map), map)
     this.culler.setMap(map)
     this.clearScene()
   }
@@ -1170,6 +1171,16 @@ export class Game {
       addSprites: this.add,
       addCount: this.nAdd,
       grade: [t, dead ? 0.7 : 0, this.hurt * 0.9, 1.15],
+      ...(this.renderer.kind === "2d" ? this.flat() : {}),
     }
+  }
+
+  /** Everyone and the bodies as plain data, for the 2D canvas. */
+  private flat(): Pick<FrameInput, "actors" | "corpses"> {
+    const actors: NonNullable<FrameInput["actors"]> = []
+    for (const a of this.avatars.values()) if (a.alive) actors.push({ x: a.x, y: a.y, aim: a.aim, color: this.colorOf(a.id), zombie: a.zombie, alive: true })
+    if (this.alive && this.body) actors.push({ x: this.drawn.x, y: this.drawn.y, aim: this.aim, color: this.colorOf(this.myId), zombie: "", alive: true })
+    const corpses = this.corpses.map((c) => ({ ...ragdollCentre(c.rd), color: this.colorOf(c.id) }))
+    return { actors, corpses }
   }
 }
