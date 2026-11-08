@@ -15,7 +15,7 @@
 }
 
 #pause .box {
-  width: min(360px, 90vw);
+  width: min(420px, 90vw);
   display: grid;
   gap: 10px;
   text-align: center;
@@ -56,4 +56,53 @@
 
 #pause button.exit {
   margin-top: 10px;
+}
+
+/* Volume sliders: label, the slider, the percentage. */
+#pause .vols {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+#pause .vol {
+  display: grid;
+  grid-template-columns: 9.5em 1fr 3.2em;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-align: left;
+}
+
+#pause .vol em {
+  display: block;
+  font-style: normal;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+#pause .vol b {
+  font-weight: 500;
+  text-align: right;
+  color: var(--ink);
+}
+
+#pause .vol input[type="range"] {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: #e8ecf4;
+  cursor: pointer;
+}
+
+#pause .vols .muted {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #ff8a70;
 }

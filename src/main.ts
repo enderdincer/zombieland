@@ -22,7 +22,14 @@ const MAX_DPR = 1.5
 const NAME_KEY = "blackout.name"
 const GUN_KEY = "blackout.gun"
 const EQUIP_KEY = "blackout.equip"
-const MUSIC_KEY = "blackout.music"
+/** Volumes, 0..1, saved per browser. The old on/off music setting reads as 0 or full. */
+const VOLUME_KEY = { fx: "blackout.fxVolume", music: "blackout.musicVolume" } as const
+const OLD_MUSIC_KEY = "blackout.music"
+const savedVolume = (kind: "fx" | "music"): number => {
+  const v = Number(localStorage.getItem(VOLUME_KEY[kind]))
+  if (localStorage.getItem(VOLUME_KEY[kind]) !== null && Number.isFinite(v)) return Math.max(0, Math.min(1, v))
+  return kind === "music" && localStorage.getItem(OLD_MUSIC_KEY) === "off" ? 0 : kind === "music" ? 0.8 : 1
+}
 
 
 /**
@@ -72,7 +79,8 @@ async function main() {
   let session: Session | null = null
   let game: Game | null = null
   let music: Music | null = null
-  let musicOn = localStorage.getItem(MUSIC_KEY) !== "off"
+  sound.setVolume("fx", savedVolume("fx"))
+  sound.setVolume("music", savedVolume("music"))
 
   const begin = (name: string, s: (name: string) => Session) => {
     const clean = cleanName(name)
@@ -101,9 +109,10 @@ async function main() {
     restart: () => session?.send({ type: "host", action: "reset", newFloor: true }),
     end: () => session?.send({ type: "host", action: "end" }),
     toggleSound: () => sound.setMuted(!sound.muted),
-    toggleMusic: () => {
-      musicOn = !musicOn
-      localStorage.setItem(MUSIC_KEY, musicOn ? "on" : "off")
+    volumes: () => ({ fx: sound.fxVolume, music: sound.musicVolume }),
+    setVolume: (kind, v) => {
+      sound.setVolume(kind, v)
+      localStorage.setItem(VOLUME_KEY[kind], String(v))
     },
   })
   const base = location.pathname.replace(/[^/]*$/, "")
@@ -201,8 +210,8 @@ async function main() {
       modeHud.update(game, cam, w, h)
       menus.update(game.snap, game.roster, session.myId, session.room, input.held("Tab") || scores, (id) => game!.colorOf(id))
       const zv = game.snap?.mode.zombies
-      pause.update({ host: !!game.roster.find((r) => r.id === session!.myId)?.host, playing: game.snap?.phase === "play", room: session.room, sound: !sound.muted, music: musicOn, musicMode: !!zv })
-      music?.update(musicOn && !!zv && game.snap?.phase === "play", zv ? threat(game) : 0, zv ? waveProgress(zv) : null)
+      pause.update({ host: !!game.roster.find((r) => r.id === session!.myId)?.host, playing: game.snap?.phase === "play", room: session.room, sound: !sound.muted, musicMode: !!zv })
+      music?.update(sound.musicVolume > 0 && !!zv && game.snap?.phase === "play", zv ? threat(game) : 0, zv ? waveProgress(zv) : null)
     }
     requestAnimationFrame(frame)
   }

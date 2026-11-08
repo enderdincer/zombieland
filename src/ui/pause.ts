@@ -7,17 +7,19 @@ export type PauseActions = {
   restart(): void
   end(): void
   toggleSound(): void
-  toggleMusic(): void
+  /** The effects and music volumes, 0..1: read when the menu draws, set as a slider moves. */
+  volumes(): { fx: number; music: number }
+  setVolume(kind: "fx" | "music", v: number): void
 }
 
-export type PauseState = { host: boolean; playing: boolean; room: string | null; sound: boolean; music: boolean; musicMode: boolean }
+export type PauseState = { host: boolean; playing: boolean; room: string | null; sound: boolean; musicMode: boolean }
 
 /** A host action needs a second click within this long. */
 const CONFIRM_MS = 2000
 
 /**
  * The Esc menu. The match keeps running underneath (it's shared), so it only takes your hands off the controls:
- * resume, sound and music, the host's restart and end, and exit to the menu.
+ * resume, mute, the effects and music volumes, the host's restart and end, and exit to the menu.
  */
 export class Pause {
   open = false
@@ -35,6 +37,16 @@ export class Pause {
       if (t) this.act(t.dataset.pause!)
       else if (e.target === this.root) this.toggle(false)
     })
+    // Sliders act as they move, without a redraw (which would drop the drag): the volume, and its label in place.
+    this.root.addEventListener("input", (e) => {
+      const t = e.target as HTMLInputElement
+      const kind = t.dataset.volume
+      if (kind !== "fx" && kind !== "music") return
+      const v = Number(t.value) / 100
+      this.a.setVolume(kind, v)
+      const label = this.root.querySelector(`[data-vlabel="${kind}"]`)
+      if (label) label.textContent = `${Math.round(v * 100)}%`
+    })
   }
 
   toggle(on = !this.open): void {
@@ -51,7 +63,6 @@ export class Pause {
   private act(what: string): void {
     if (what === "resume") return this.toggle(false)
     if (what === "sound") return this.a.toggleSound()
-    if (what === "music") return this.a.toggleMusic()
     if (what === "exit") {
       this.toggle(false)
       return this.a.exit()
@@ -67,6 +78,16 @@ export class Pause {
     this.toggle(false)
     if (what === "restart") this.a.restart()
     else if (what === "end") this.a.end()
+  }
+
+  /** The two volume sliders; music is only heard in the zombie modes, so it says so elsewhere. */
+  private sliders(s: PauseState): string {
+    const v = this.a.volumes()
+    const row = (kind: "fx" | "music", label: string, note: string) => {
+      const pct = Math.round(v[kind] * 100)
+      return `<label class="vol"><span>${label}${note ? `<em>${note}</em>` : ""}</span><input type="range" min="0" max="100" step="1" value="${pct}" data-volume="${kind}" /><b data-vlabel="${kind}">${pct}%</b></label>`
+    }
+    return `<div class="vols">${row("fx", "SOUND EFFECTS", "")}${row("music", "MUSIC", s.musicMode ? "" : "zombie modes")}${s.sound ? "" : `<div class="muted">muted · press M or unmute below</div>`}</div>`
   }
 
   update(s: PauseState): void {
@@ -89,10 +110,8 @@ export class Pause {
       <div class="logo small">PAUSED</div>
       <div class="sub">${s.room ? `the match keeps going · room <b>${s.room.toUpperCase()}</b>` : "the match keeps going"}</div>
       <button class="primary" data-pause="resume">RESUME <kbd>ESC</kbd></button>
-      <div class="pair">
-        <button data-pause="sound">SOUND ${s.sound ? "ON" : "OFF"} <kbd>M</kbd></button>
-        ${s.musicMode ? `<button data-pause="music">MUSIC ${s.music ? "ON" : "OFF"}</button>` : ""}
-      </div>
+      ${this.sliders(s)}
+      <button data-pause="sound">${s.sound ? "MUTE ALL" : "UNMUTE"} <kbd>M</kbd></button>
       ${host}
       <button class="exit" data-pause="exit">EXIT TO MENU</button>
     </div>`
