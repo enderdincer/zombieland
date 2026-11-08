@@ -13,7 +13,12 @@ export class Sound {
   private verb: ConvolverNode | null = null
   private noise: AudioBuffer | null = null
   private music: GainNode | null = null
+  /** Every sound effect goes through here, so the effects volume is one gain; the music has its own. */
+  private fx: GainNode | null = null
   muted = false
+  /** Effects and music volumes, 0..1 (the Esc menu's sliders). */
+  fxVolume = 1
+  musicVolume = 1
 
   start(): void {
     if (this.ctx) {
@@ -31,6 +36,9 @@ export class Sound {
     this.master = ctx.createGain()
     this.master.gain.value = 0.75
     this.master.connect(this.comp).connect(ctx.destination)
+    this.fx = ctx.createGain()
+    this.fx.gain.value = this.fxVolume
+    this.fx.connect(this.master)
     const len = ctx.sampleRate
     const buf = ctx.createBuffer(1, len, ctx.sampleRate)
     const d = buf.getChannelData(0)
@@ -52,7 +60,7 @@ export class Sound {
     this.verb.buffer = ir
     const vg = ctx.createGain()
     vg.gain.value = 0.55
-    this.verb.connect(vg).connect(this.master)
+    this.verb.connect(vg).connect(this.fx)
     // Faint air-conditioning hum.
     const hum = ctx.createBufferSource()
     hum.buffer = buf
@@ -62,7 +70,7 @@ export class Sound {
     lp.frequency.value = 180
     const hg = ctx.createGain()
     hg.gain.value = 0.025
-    hum.connect(lp).connect(hg).connect(this.master)
+    hum.connect(lp).connect(hg).connect(this.fx)
     hum.start()
   }
 
@@ -71,9 +79,19 @@ export class Sound {
     if (!this.ctx || !this.master) return null
     if (!this.music) {
       this.music = this.ctx.createGain()
+      this.music.gain.value = this.musicVolume
       this.music.connect(this.master)
     }
     return { ctx: this.ctx, out: this.music }
+  }
+
+  /** Sets the effects or music volume (0..1), at once if the audio is running, else when it starts. */
+  setVolume(kind: "fx" | "music", v: number): void {
+    const k = Math.max(0, Math.min(1, v))
+    if (kind === "fx") this.fxVolume = k
+    else this.musicVolume = k
+    const node = kind === "fx" ? this.fx : this.music
+    if (node && this.ctx) node.gain.setTargetAtTime(k, this.ctx.currentTime, 0.02)
   }
 
   setMuted(m: boolean): void {
@@ -84,7 +102,7 @@ export class Sound {
   /** A source (dx, dy) metres away: distance gain, pan, top end rolled off with distance, and a reverb send. */
   private out(dx: number, dy: number, gain: number, wet = 0.15): AudioNode | null {
     const ctx = this.ctx
-    if (!ctx || !this.master || this.muted || ctx.state !== "running") return null
+    if (!ctx || !this.fx || this.muted || ctx.state !== "running" || this.fxVolume <= 0) return null
     const d = Math.hypot(dx, dy)
     const g = ctx.createGain()
     g.gain.value = gain / (1 + d * d * 0.01)
@@ -93,7 +111,7 @@ export class Sound {
     lp.frequency.value = Math.min(20000, 22000 / (1 + d * 0.18))
     const pan = ctx.createStereoPanner()
     pan.pan.value = Math.max(-0.85, Math.min(0.85, dx / 12))
-    g.connect(lp).connect(pan).connect(this.master)
+    g.connect(lp).connect(pan).connect(this.fx)
     if (wet > 0 && this.verb) {
       const s = ctx.createGain()
       s.gain.value = wet * Math.min(2.5, 1 + d * 0.06)
